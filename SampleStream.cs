@@ -7,8 +7,6 @@ namespace NuclearVOIP
     {
         private class Node(float[] samples)
         {
-            private static int lastId = 0;
-            public readonly int id = Interlocked.Increment(ref lastId);
             public readonly float[] samples = samples;
             public volatile Node? next;
         }
@@ -45,8 +43,9 @@ namespace NuclearVOIP
             Node ourHead = head;
 
             Node curNode = ourHead;
-            int lastPos = 0;
+            int lastPos;
             int pos = 0;
+            Node? newHead;
             while (true)
             {
                 int toRead = Math.Min(numSamples - pos, curNode.samples.Length);
@@ -63,21 +62,20 @@ namespace NuclearVOIP
                         return null;
                 }
                 else
+                {
+                    if (toRead < curNode.samples.Length) // Entire buffer not read
+                    {
+                        newHead = new(curNode.samples[toRead..])
+                        {
+                            next = curNode.next
+                        };
+                    }
+                    else
+                        newHead = curNode.next;
+
                     break;
+                }
             }
-
-            int wasRead = pos - lastPos;
-            Node? newHead;
-            if (wasRead < curNode.samples.Length) // Entire buffer not read
-            {
-                float[] newArr = new float[curNode.samples.Length - wasRead];
-                Array.Copy(curNode.samples, wasRead, newArr, 0, newArr.Length);
-
-                newHead = new(newArr);
-                newHead.next = curNode.next;
-            }
-            else
-                newHead = curNode.next;
 
             Node? oldHead = Interlocked.CompareExchange(ref head, newHead, ourHead);
             if (oldHead != ourHead)

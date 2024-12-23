@@ -6,19 +6,98 @@ using System.Threading;
 
 namespace NuclearVOIP
 {
-    internal class OpusEncoder: GenericStream<byte[]>
+    internal class OpusEncoder : GenericStream<byte[]>
     {
         private readonly SampleStream parent;
         private readonly IntPtr encoder;
+
+        private readonly IntPtr decoder;
+        private bool decoder_good = true;
+
         private readonly int frameSize;
 
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
 
         public readonly int lookahead;
+        public readonly SampleStream original;
 
-        public OpusEncoder(SampleStream parent)
+        public int BitRate
+        {
+            get
+            {
+                return GetCtl(LibOpus.EncoderCtl.GET_BITRATE);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_BITRATE, value);
+            }
+        }
+
+        public int PacketLoss
+        {
+            get
+            {
+                return GetCtl(LibOpus.EncoderCtl.GET_PACKET_LOSS_PERC);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_PACKET_LOSS_PERC, value);
+            }
+        }
+
+        public LibOpus.FEC FEC
+        {
+            get
+            {
+                return (LibOpus.FEC)GetCtl(LibOpus.EncoderCtl.GET_INBAND_FEC);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_INBAND_FEC, (int)value);
+            }
+        }
+
+        public bool DTX
+        {
+            get
+            {
+                return GetCtl(LibOpus.EncoderCtl.GET_DTX) == 1;
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_DTX, value ? 1 : 0);
+            }
+        }
+
+        public LibOpus.Signal Signal
+        {
+            get
+            {
+                return (LibOpus.Signal)GetCtl(LibOpus.EncoderCtl.GET_SIGNAL);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_SIGNAL, (int)value);
+            }
+        }
+
+        public int LSB_Depth
+        {
+            get
+            {
+                return GetCtl(LibOpus.EncoderCtl.GET_LSB_DEPTH);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_LSB_DEPTH, value);
+            }
+        }
+
+        unsafe public OpusEncoder(SampleStream parent)
         {
             this.parent = parent;
+            original = new(parent.frequency);
+
             frameSize = (int)(0.02 * parent.frequency);
 
             encoder = Marshal.AllocHGlobal(LibOpus.opus_encoder_get_size(1));
@@ -29,15 +108,19 @@ namespace NuclearVOIP
                 throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
             }
 
-            SetCtl(LibOpus.EncoderCtl.SET_BITRATE, 24000);
+            decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
+            err = LibOpus.opus_decoder_init(decoder, parent.frequency, 1);
+            if (err != 0)
+            {
+                Marshal.FreeHGlobal(encoder);
+                throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
+            }
 
-            SetCtl(LibOpus.EncoderCtl.SET_INBAND_FEC, 1);
-
-            SetCtl(LibOpus.EncoderCtl.SET_DTX, 1);
-
-            SetCtl(LibOpus.EncoderCtl.SET_SIGNAL, (int)LibOpus.Signal.VOICE);
-
-            GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD, ref lookahead);
+            BitRate = 24000;
+            //FEC = LibOpus.FEC.AGGRESSIVE;
+            //DTX = true;
+            Signal = LibOpus.Signal.VOICE;
+            lookahead = GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD);
 
             parent.OnData += DoEncode;
         }
@@ -46,6 +129,7 @@ namespace NuclearVOIP
         {
             parent.OnData -= DoEncode;
             Marshal.FreeHGlobal(encoder);
+            Marshal.FreeHGlobal(decoder);
         }
 
         private void DoEncode(SampleStream parent)
@@ -62,41 +146,96 @@ namespace NuclearVOIP
                     if (rawFrame == null)
                         return;
 
-                    byte[] frame = new byte[60]; // 20ms at 24kbps
-
-                    //IntPtr buf = Marshal.AllocHGlobal(60);
-
-                    int err = LibOpus.opus_encode_float(encoder, rawFrame, frameSize, frame, 60);
-
-                    if (err < 0)
-                    {
-                        //Marshal.FreeHGlobal(buf);
-                        throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
-                    }
-                    else
-                    {
-                        //Marshal.Copy(buf, frame, 0, err);
-                        //Marshal.FreeHGlobal(buf);
-                    }
-
-                    Array.Resize(ref frame, err);
-
-                    if (frame.Length > 0)
-                        frames.AddLast(frame);
+                    original.Write(rawFrame);
+                    frames.AddLast(EncodeFrame(rawFrame));
                 }
 
                 if (frames.Count() > 0)
                 {
-                    Plugin.Instance!.Logger.LogDebug("Writing Opus frame(s)");
+                    Plugin.Instance.Logger.LogDebug("Writing Opus frame(s)");
                     Write(frames.ToArray());
                 }
                 else
-                    Plugin.Instance!.Logger.LogDebug("No Opus frames to write");
+                    Plugin.Instance.Logger.LogDebug("No Opus frames to write");
             }
             finally
             {
                 readLock.ReleaseMutex();
             }
+        }
+
+        public void Close()
+        {
+            readLock.WaitOne();
+
+            try
+            {
+                LinkedList<byte[]> frames = new();
+                int count;
+                while ((count = parent.Count()) > 0)
+                {
+                    float[]? rawFrame = parent.Read(count > frameSize ? frameSize : count);
+                    if (rawFrame == null)
+                        return;
+
+                    original.Write(rawFrame);
+                    if (rawFrame.Length < frameSize)
+                        Array.Resize(ref rawFrame, frameSize);
+
+                    frames.AddLast(EncodeFrame(rawFrame));
+                }
+
+                if (frames.Count() > 0)
+                {
+                    Plugin.Instance.Logger.LogDebug("Writing Opus frame(s)");
+                    Write(frames.ToArray());
+                }
+                else
+                    Plugin.Instance.Logger.LogDebug("No Opus frames to write");
+            }
+            finally
+            {
+                readLock.ReleaseMutex();
+            }
+        }
+
+        private unsafe byte[] EncodeFrame(float[] samples)
+        {
+            byte[] frame = new byte[4000];
+
+            int err = LibOpus.opus_encode_float(encoder, samples, frameSize, frame, 4000);
+            if (err < 0)
+                throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
+
+            Array.Resize(ref frame, err);
+
+            if (decoder_good)
+            {
+                float[] decoded = new float[5760];
+                err = LibOpus.opus_decode_float(decoder, frame, frame.Length, decoded, 5760, 0);
+
+                if (err < 0)
+                {
+                    Plugin.Instance.Logger.LogWarning("WARNING: Decoder failure when verifying encoding. Disabling verification.");
+                    decoder_good = false;
+                }
+                else
+                {
+                   if (err != frameSize)
+                        throw new ValidationException();
+
+                    Array.Resize(ref decoded, err);
+                    for (int i = 0; i < frameSize; i++)
+                    {
+                        float error = decoded[i] - samples[i];
+
+                        if (Math.Abs(error) > 0.2)
+                            throw new ValidationException(samples[i], decoded[i]);
+                    }
+                }
+            }
+
+            return frame;
         }
 
         private void SetCtl(LibOpus.EncoderCtl ctl, int val)
@@ -108,14 +247,30 @@ namespace NuclearVOIP
                 throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
             }
         }
-        private void GetCtl(LibOpus.EncoderCtl ctl, ref int val)
+
+        private unsafe int GetCtl(LibOpus.EncoderCtl ctl)
         {
-            int err = LibOpus.opus_encoder_ctl(encoder, (int)ctl, ref val);
+            int result = 0;
+            int err = LibOpus.opus_encoder_ctl(encoder, (int)ctl, result);
+
             if (err != 0)
             {
                 Marshal.FreeHGlobal(encoder);
                 throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
             }
+
+            return result;
         }
+
+        public class ValidationException: Exception
+        {
+            internal ValidationException(): base("encoder decoder length disagreement")
+            {
+            }
+
+            internal ValidationException(float encoded, float decoded): base($"encoder decoder sample disagreement ({encoded}, {decoded})")
+            {
+            }
+        };
     }
 }

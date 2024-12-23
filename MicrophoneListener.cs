@@ -1,17 +1,17 @@
 ﻿using System;
+using System.Threading;
 using UnityEngine;
 
 namespace NuclearVOIP
 {
     internal class MicrophoneListener: MonoBehaviour
     {
-        class MicrophoneError: Exception
-        {}
+        class MicrophoneError(): Exception("microphone initialization failure");
 
         private AudioClip? audioClip;
         private int pos = 0;
 
-        public SampleStream stream = new(48000);
+        public readonly SampleStream stream = new(48000);
 
         private void Awake()
         {
@@ -20,7 +20,7 @@ namespace NuclearVOIP
 
         private void OnEnable()
         {
-            audioClip = Microphone.Start(null, true, 2, 48000);
+            audioClip = Microphone.Start(null, true, 5, stream.frequency);
             if (audioClip == null)
             {
                 throw new MicrophoneError();
@@ -30,15 +30,19 @@ namespace NuclearVOIP
 
         private void OnDisable()
         {
+            Update(); // Just one more in case we have more data
             Microphone.End(null);
+            audioClip = null;
         }
 
         private void OnDestroy()
         {
+            Update(); // Just one more in case we have more data
             Microphone.End(null);
+            audioClip = null;
         }
 
-        private void FixedUpdate()
+        private void Update()
         {
             if (audioClip == null)
                 return;
@@ -52,7 +56,6 @@ namespace NuclearVOIP
                 audioClip.GetData(buf, pos);
                 pos = mPos;
 
-                Plugin.Instance!.Logger.LogDebug($"Writing microphone frame ({toRead} samples)");
                 stream.Write(buf);
             }
         }

@@ -3,19 +3,16 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
-using UnityEngine;
 
 namespace NuclearVOIP
 {
     internal class Ogg
     {
-        static readonly Crc32Base hasher = new(0x04C11DB7, 0x0, 0x0, true, true, 0x89A1897F);
-
         private int streams = 0;
 
         public class Stream(Ogg file)
         {
-            private readonly int serial = Interlocked.Increment(ref file.streams) - 1;
+            public readonly int serial = Interlocked.Increment(ref file.streams) - 1;
 
             private int _sequence = 0;
             public int Sequence
@@ -26,7 +23,7 @@ namespace NuclearVOIP
             private int _finalized = 0;
             public bool Finalized
             {
-                get { return _finalized == 0; }
+                get { return _finalized == int.MaxValue; }
             }
 
             public byte[] EncodePage(byte[][] segments, long granule, bool continued = false, bool final = false)
@@ -52,13 +49,12 @@ namespace NuclearVOIP
                         throw new ArgumentException("OggStream final but continues");
                 } else
                 {
-                    if (sizes[sizes.Length - 1] == 255)
+                    if (sizes[^1] == 255)
                         //throw new ArgumentException("OggStream last segment is continued but there is spare space");
-                        Debug.LogWarning("OggStream last segment is continued but there is spare space");
+                        Plugin.Instance!.Logger.LogWarning("OggStream last segment is continued but there is spare space");
                 }
                 
-
-                if ((final && Interlocked.Exchange(ref _finalized, int.MaxValue) == int.MaxValue) || Finalized)
+                if (Finalized || (final && (Interlocked.Exchange(ref _finalized, int.MaxValue) == int.MaxValue))) // Order of operations matter
                     throw new InvalidOperationException("Ogg.Stream finalized");
 
                 int seq = Interlocked.Increment(ref _sequence) - 1;
@@ -80,6 +76,7 @@ namespace NuclearVOIP
                 writer.Write(seq);
                 writer.Write(0);
                 writer.Write((byte)segments.Length);
+                writer.Write(sizes);
                 writer.Flush();
 
                 long pos = stream.Position;
@@ -90,7 +87,10 @@ namespace NuclearVOIP
                 }
 
                 writer.Seek(22, SeekOrigin.Begin);
-                writer.Write(hasher.ComputeHash(page));
+
+                Crc32Base hasher = new(0x4C11DB7, 0x0, 0x0, false, false);
+                byte[] checksum = hasher.ComputeHash(page);
+                writer.Write(checksum);
                 writer.Close();
 
                 return page;
@@ -127,9 +127,9 @@ namespace NuclearVOIP
                         break;
                     }
 
-                    segments[i] = new byte[i == nSegments ? frame.Length - pos : 255];
-                    Array.Copy(frame, pos, segments[i], 0, segments[i].Length);
-                    pos += segments[i].Length;
+                    int length = i == nSegments - 1 ? frame.Length - pos : 255;
+                    segments[i] = frame[pos..(pos + length)];
+                    pos += length;
                 }
 
                 return segments;

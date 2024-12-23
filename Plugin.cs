@@ -7,8 +7,8 @@ using System.Threading;
 using NuclearOption.SavedMission;
 using System.IO;
 using BepInEx.Logging;
-using UnityEngine;
 using System.Linq;
+using NuclearOption.Networking;
 
 namespace NuclearVOIP
 {
@@ -17,9 +17,15 @@ namespace NuclearVOIP
     public class Plugin : BaseUnityPlugin
     {
         private static Plugin? _Instance;
-        internal static Plugin? Instance
+        internal static Plugin Instance
         {
-            get { return _Instance; }
+            get
+            {
+                if (_Instance == null)
+                    throw new InvalidOperationException("Plugin not initialized");
+
+                return _Instance;
+            }
         }
 
         internal new ManualLogSource Logger
@@ -29,11 +35,9 @@ namespace NuclearVOIP
 
         internal readonly ConfigEntry<KeyboardShortcut> configTalkKey;
 
-        internal MicrophoneListener? activeListener;
-        internal OpusEncoder? encoder;
+        internal MicrophoneListener activeListener;
         internal FileStream? fStream;
         internal OggOpus? oStream;
-        internal int seq;
 
         Plugin()
         {
@@ -56,10 +60,9 @@ namespace NuclearVOIP
         private void Awake()
         {
             Logger.LogInfo($"Loaded {MyPluginInfo.PLUGIN_GUID}");
-            Logger.LogDebug($"Debug logs enabled");
+            activeListener = gameObject.AddComponent<MicrophoneListener>();
 
             MissionManager.onMissionStart += MissionHook;
-            MissionManager.onMissionUnload += MissionUnload;
         }
 
         private void OnDestroy()
@@ -69,45 +72,65 @@ namespace NuclearVOIP
 
         private void MissionHook(Mission mission)
         {
-            activeListener = GameManager.LocalPlayer.gameObject.AddComponent<MicrophoneListener>();
-            encoder = new(activeListener.stream);
-            fStream = new("test.opus", FileMode.OpenOrCreate | FileMode.Truncate);
+            NetworkManagerNuclearOption.i.Client.Disconnected.AddListener(MissionUnload);
+
+            fStream = new("test.opus", FileMode.OpenOrCreate);
             fStream.SetLength(0);
+            fStream.Flush();
 
-            Ogg oFile = new();
-            oStream = new(oFile, 1, (short)encoder.lookahead, 20);
-
-            encoder.OnData += (stream) =>
-            {
-                byte[][]? frames = encoder.Read(encoder.Count());
-                if (frames == null)
-                    return;
-
-                oStream.Write(frames);
-            };
+            oStream = new(new(), activeListener.stream, 1, 20);
+            FlushOStream();
 
             oStream.OnData += (stream) =>
             {
-                byte[][]? pages = oStream.Read(oStream.Count());
-                if (pages == null)
-                    return;
-
-                fStream.Write(pages.SelectMany(a => a).ToArray());
+                FlushOStream();
             };
         }
 
-        private void MissionUnload()
+        private void MissionUnload(Mirage.ClientStoppedReason reason)
         {
-            activeListener = null;
-            encoder = null;
+            NetworkManagerNuclearOption.i.Client.Disconnected.RemoveListener(MissionUnload);
 
-            oStream!.Close();
-            fStream!.Close();
+            if (fStream == null)
+                return;
+
+            oStream?.Close();
+            fStream?.Close();
+
+            activeListener.enabled = false;
+
+            float[]? originalPCM = oStream!.encoder.original.Read(oStream!.encoder.original.Count());
+
+            using FileStream raw = new("test.raw", FileMode.OpenOrCreate);
+            raw.SetLength(0);
+            raw.Flush();
+
+            if (originalPCM != null)
+            {
+                byte[] buf = new byte[originalPCM!.Length << 2];
+                Buffer.BlockCopy(originalPCM, 0, buf, 0, buf.Length);
+
+                raw.Write(buf, 0, buf.Length);
+            }
+
+            raw.Close();
+
+            float[] fPCM = originalPCM.Select(a => a * short.MaxValue).ToArray();
+
+            short[] pcm = fPCM.Select(a => (short)a).ToArray();
+            short[] reversed = Utils.ReverseEndianness(pcm);
+            Array.Resize(ref reversed, ((reversed.Length / 960) + 1) * 960);
+
+            byte[] bPCM = new byte[reversed.Length * 2];
+            Buffer.BlockCopy(reversed, 0, bPCM, 0, bPCM.Length);
+
+            oStream = null;
+            fStream = null;
         }
 
         private void Update()
         {
-            if (activeListener == null)
+            if (fStream == null)
                 return;
 
             if (configTalkKey.Value.IsPressed())
@@ -118,6 +141,16 @@ namespace NuclearVOIP
                 oStream!.Flush();
                 fStream!.Flush();
             }
+        }
+
+        private void FlushOStream()
+        {
+            byte[][]? pages = oStream!.Read(oStream.Count());
+            if (pages == null)
+                return;
+
+            Logger.LogDebug($"Writing OggOpus {pages.Length} page(s) to file");
+            fStream!.Write(pages.SelectMany(a => a).ToArray());
         }
     }
 }

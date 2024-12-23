@@ -33,7 +33,7 @@ namespace NuclearVOIP
 
             Node ourHead = new(data[0]);
             Node curNode = ourHead;
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 1; i < data.Length; i++)
             {
                 curNode.next = new(data[i]);
                 curNode = curNode.next;
@@ -57,7 +57,11 @@ namespace NuclearVOIP
                 ourNode = head;
 
             if (ourNode != null)
+            {
+                Interlocked.CompareExchange(ref tail, null, ourNode);
+
                 return ourNode.data;
+            }
             else 
                 return default;
         }
@@ -70,7 +74,7 @@ namespace NuclearVOIP
 
             Node ourHead = head;
             Node? endNode = head;
-            for (int i = 1; i < num; i++)
+            for (int i = 0; i < num; i++)
             {
                 if (endNode == null)
                     break;
@@ -78,11 +82,11 @@ namespace NuclearVOIP
                     endNode = endNode.next;
             }
 
-            if (endNode == null)
-                return null;
-
             if (Interlocked.CompareExchange(ref head, endNode, ourHead) != ourHead)
                 goto loop;
+
+            if (endNode == null)
+                Interlocked.CompareExchange(ref tail, null, null);
 
             Node curNode = ourHead;
             T[] values = new T[num];
