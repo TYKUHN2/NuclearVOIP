@@ -5,10 +5,10 @@ using BepInEx.Unity.Mono.Configuration;
 using System;
 using System.Threading;
 using NuclearOption.SavedMission;
-using System.IO;
 using BepInEx.Logging;
-using System.Linq;
 using NuclearOption.Networking;
+using Mirage;
+using Steamworks;
 using UnityEngine;
 
 namespace NuclearVOIP
@@ -39,11 +39,12 @@ namespace NuclearVOIP
             get { return base.Logger; }
         }
 
-        internal readonly ConfigEntry<KeyboardShortcut> configTalkKey;
+        private OpusMultiStreamer? streamer;
 
-        internal MicrophoneListener activeListener;
-        internal FileStream? fStream;
-        internal OggOpus? oStream;
+        internal readonly ConfigEntry<KeyboardShortcut> configTalkKey;
+        internal readonly ConfigEntry<KeyboardShortcut> configAllTalkKey;
+
+        internal readonly ConfigEntry<int> configVOIPPort;
 
         Plugin()
         {
@@ -56,6 +57,22 @@ namespace NuclearVOIP
                     new KeyboardShortcut(KeyCode.V),
                     "Push to talk key"
                 );
+
+            configAllTalkKey = Config.Bind(
+                    "General",
+                    "All Talk Key",
+                    new KeyboardShortcut(KeyCode.C),
+                    "Push to talk to all key"
+                );
+
+            configVOIPPort = Config.Bind(
+                    "General",
+                    "VOIP Port",
+                    5000,
+                    "The port to discover and transmit voice chat on"
+                );
+
+            LoadingManager.NetworkReady += LateLoad;
         }
 
         ~Plugin()
@@ -66,9 +83,29 @@ namespace NuclearVOIP
         private void Awake()
         {
             Logger.LogInfo($"Loaded {MyPluginInfo.PLUGIN_GUID}");
-            activeListener = gameObject.AddComponent<MicrophoneListener>();
+        }
 
-            MissionManager.onMissionStart += MissionHook;
+        private void LateLoad()
+        {
+            Logger.LogInfo($"LateLoading {MyPluginInfo.PLUGIN_GUID}");
+            if (!SteamManager.Initialized)
+            {
+                Logger.LogWarning("Disabling VOIP: steam is not initalized");
+                return;
+            }
+
+            LoadingManager.MissionUnloaded += MissionUnload;
+            LoadingManager.MissionLoaded += LoadingFinished;
+
+            SteamNetworking.AllowP2PPacketRelay(true);
+
+            if (SteamNetworkingSockets.GetAuthenticationStatus(out _) == ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_NeverTried)
+                SteamNetworkingSockets.InitAuthentication();
+            
+            if (SteamNetworkingUtils.GetRelayNetworkStatus(out _) == ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_NeverTried)
+                SteamNetworkingUtils.InitRelayNetworkAccess();
+
+            Logger.LogInfo($"LateLoaded {MyPluginInfo.PLUGIN_GUID}");
         }
 
         private void OnDestroy()
@@ -76,87 +113,18 @@ namespace NuclearVOIP
             Logger.LogInfo($"Unloaded {MyPluginInfo.PLUGIN_GUID}");
         }
 
-        private void MissionHook(Mission mission)
+        private void MissionUnload()
         {
-            NetworkManagerNuclearOption.i.Client.Disconnected.AddListener(MissionUnload);
-
-            fStream = new("test.opus", FileMode.OpenOrCreate);
-            fStream.SetLength(0);
-            fStream.Flush();
-
-            oStream = new(new(), activeListener.stream, 1, 20);
-            FlushOStream();
-
-            oStream.OnData += (stream) =>
-            {
-                FlushOStream();
-            };
+            streamer = null;
         }
 
-        private void MissionUnload(Mirage.ClientStoppedReason reason)
+        private void LoadingFinished()
         {
-            NetworkManagerNuclearOption.i.Client.Disconnected.RemoveListener(MissionUnload);
+            GameObject host = GameManager.LocalPlayer.gameObject;
+            NetworkSystem networking = host.AddComponent<NetworkSystem>();
+            CommSystem comms = host.AddComponent<CommSystem>();
 
-            if (fStream == null)
-                return;
-
-            oStream?.Close();
-            fStream?.Close();
-
-            activeListener.enabled = false;
-
-            float[]? originalPCM = oStream!.encoder.original.Read(oStream!.encoder.original.Count());
-
-            using FileStream raw = new("test.raw", FileMode.OpenOrCreate);
-            raw.SetLength(0);
-            raw.Flush();
-
-            if (originalPCM != null)
-            {
-                byte[] buf = new byte[originalPCM!.Length << 2];
-                Buffer.BlockCopy(originalPCM, 0, buf, 0, buf.Length);
-
-                raw.Write(buf, 0, buf.Length);
-            }
-
-            raw.Close();
-
-            float[] fPCM = originalPCM.Select(a => a * short.MaxValue).ToArray();
-
-            short[] pcm = fPCM.Select(a => (short)a).ToArray();
-            short[] reversed = Utils.ReverseEndianness(pcm);
-            Array.Resize(ref reversed, ((reversed.Length / 960) + 1) * 960);
-
-            byte[] bPCM = new byte[reversed.Length * 2];
-            Buffer.BlockCopy(reversed, 0, bPCM, 0, bPCM.Length);
-
-            oStream = null;
-            fStream = null;
-        }
-
-        private void Update()
-        {
-            if (fStream == null)
-                return;
-
-            if (configTalkKey.Value.IsPressed())
-                activeListener.enabled = true;
-            else if (activeListener.enabled)
-            {
-                activeListener.enabled = false;
-                oStream!.Flush();
-                fStream!.Flush();
-            }
-        }
-
-        private void FlushOStream()
-        {
-            byte[][]? pages = oStream!.Read(oStream.Count());
-            if (pages == null)
-                return;
-
-            Logger.LogDebug($"Writing OggOpus {pages.Length} page(s) to file");
-            fStream!.Write(pages.SelectMany(a => a).ToArray());
+            streamer = new(comms, networking);
         }
     }
 }
