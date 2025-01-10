@@ -6,21 +6,18 @@ using System.Threading;
 
 namespace NuclearVOIP
 {
-    internal class OpusEncoder : GenericStream<byte[]>
+    internal class OpusEncoder: AbstractTransform<float, byte[]>
     {
-        private readonly SampleStream parent;
         private const bool DECODER_TEST = true;
         private readonly IntPtr encoder;
-
         private readonly IntPtr decoder;
         private bool decoder_good = true;
-
         private readonly int frameSize;
-
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
 
+        float[] leftover;
+
         public readonly int lookahead;
-        public readonly SampleStream original;
 
         public int BitRate
         {
@@ -94,27 +91,28 @@ namespace NuclearVOIP
             }
         }
 
-        unsafe public OpusEncoder(SampleStream parent)
+        unsafe public OpusEncoder(int frequency)
         {
-            this.parent = parent;
-            original = new(parent.frequency);
-
-            frameSize = (int)(0.02 * parent.frequency);
+            frameSize = (int)(0.02 * frequency);
 
             encoder = Marshal.AllocHGlobal(LibOpus.opus_encoder_get_size(1));
-            int err = LibOpus.opus_encoder_init(encoder, parent.frequency, 1, (int)LibOpus.Modes.VOIP);
+            int err = LibOpus.opus_encoder_init(encoder, frequency, 1, (int)LibOpus.Modes.VOIP);
             if (err != 0)
             {
                 Marshal.FreeHGlobal(encoder);
                 throw new LibOpus.OpusException(err);
             }
 
-            decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
-            err = LibOpus.opus_decoder_init(decoder, parent.frequency, 1);
-            if (err != 0)
+            if (DECODER_TEST)
             {
-                Marshal.FreeHGlobal(encoder);
-                throw new Exception("libopus: " + Marshal.PtrToStringAnsi(LibOpus.opus_strerror(err)));
+                decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
+                err = LibOpus.opus_decoder_init(decoder, frequency, 1);
+                if (err != 0)
+                {
+                    Marshal.FreeHGlobal(encoder);
+                    Marshal.FreeHGlobal(decoder);
+                    throw new LibOpus.OpusException(err);
+                }
             }
 
             BitRate = 24000;
@@ -122,22 +120,17 @@ namespace NuclearVOIP
             //DTX = true;
             Signal = LibOpus.Signal.VOICE;
             lookahead = GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD);
-
-            parent.OnData += DoEncode;
-        }
-
-        ~OpusEncoder()
-        {
-            parent.OnData -= DoEncode;
         }
 
         ~OpusEncoder()
         {
             Marshal.FreeHGlobal(encoder);
-            Marshal.FreeHGlobal(decoder);
+
+            if (DECODER_TEST)
+                Marshal.FreeHGlobal(decoder);
         }
 
-        private void DoEncode(SampleStream parent)
+        private void DoEncode(StreamArgs<float> args)
         {
             if (!readLock.WaitOne(0))
                 return;
@@ -151,8 +144,28 @@ namespace NuclearVOIP
                     if (rawFrame == null)
                         return;
 
-                    original.Write(rawFrame);
                     frames.AddLast(EncodeFrame(rawFrame));
+                }
+
+                if (parent.Count() + args.data.Length >= frameSize)
+                {
+                    args.Handle();
+
+                    float[]? prefix = parent.Read(parent.Count());
+                    float[][] rawFrames = new float[args.data.Length / frameSize + 1][];
+                    rawFrames[0] = [..prefix, ..args.data.Take(frameSize - (prefix?.Length ?? 0))];
+
+                    for (int i = 1; i < rawFrames.Length; i++)
+                        rawFrames[i] = args.data.Skip((i * frameSize) - (prefix?.Length ?? 0)).Take(frameSize).ToArray();
+
+                    if (rawFrames[^1].Length != frameSize)
+                    {
+                        parent.Write(rawFrames[^1]);
+                        Array.Resize(ref rawFrames, rawFrames.Length - 1);
+                    }
+
+                    foreach (float[] rawFrame in rawFrames)
+                        frames.AddLast(EncodeFrame(rawFrame));
                 }
 
                 if (frames.Count() > 0)
@@ -183,7 +196,6 @@ namespace NuclearVOIP
                     if (rawFrame == null)
                         return;
 
-                    original.Write(rawFrame);
                     if (rawFrame.Length < frameSize)
                         Array.Resize(ref rawFrame, frameSize);
 
@@ -202,6 +214,24 @@ namespace NuclearVOIP
             {
                 readLock.ReleaseMutex();
             }
+        }
+
+        protected override byte[][] Transform(float[] data)
+        {
+            float[] rawFrame = [.. leftover, ..data];
+            byte[][] frames = new byte[rawFrame.Length / frameSize][];
+
+            for (int i = 0; i < frames.Length; i++)
+            {
+                int offset = i * frameSize;
+                frames[i] = EncodeFrame(rawFrame[offset..(offset + frameSize)]);
+            }
+
+            int leftoverSize = rawFrame.Length % frameSize;
+            if (leftoverSize != 0)
+                leftover = rawFrame[^(leftoverSize + 1)..];
+
+            return frames;
         }
 
         private unsafe byte[] EncodeFrame(float[] samples)

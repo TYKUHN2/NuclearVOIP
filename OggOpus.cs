@@ -63,26 +63,24 @@ namespace NuclearVOIP
             base.Write(EncodeOpus(data, true));
         }
 
-        private void OnParent(IStream<byte[], byte[]> _)
+        private void OnParent(StreamArgs<byte[]> args)
         {
-            byte[][]? pFrames = encoder.Read(encoder.Count());
-            if (pFrames == null) 
-                return;
-
-            frames.Write(pFrames);
+            args.Handle();
+            frames.Write(args.data);
         }
 
-        private void OnFrame(IStream<byte[], byte[]> _)
+        private void OnFrame(StreamArgs<byte[]> args)
         {
-            int count = frames.Count() - 1; // Leave last frame for closing reasons
-            if (count < 50)
+            int count = frames.Count();
+            if (count + args.data.Length < 51) // Leave last frame for closing reasons
                 return;
 
-            byte[][]? buf = frames.Read(count);
-            if (buf == null)
-                return;
+            args.Handle();
 
+            byte[][]? buf = [..frames.Read(count), ..(args.data[..^2])];
             base.Write(EncodeOpus(buf, false));
+
+            frames.Write(args.data[^1]);
         }
 
         private byte[][] EncodeOpusHeaders(byte channels, short preskip)

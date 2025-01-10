@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace NuclearVOIP
 {
-    internal class GenericStream<T>: IStream<T, T>
+    public class AbstractStream<T> : InStream<T>, OutStream<T>
     {
         protected class Node(T data)
         {
@@ -14,31 +14,33 @@ namespace NuclearVOIP
         protected Node? head;
         protected Node? tail;
 
+        protected InStream<T>? consumer;
+
         public event Action<StreamArgs<T>>? OnData;
-        
+
         public virtual void Write(T data)
         {
-            StreamArgs<T> args = new([data]);
-            OnData?.Invoke(args);
-
-            if (args.Handled)
-                return;
-
-            Node node = new(data);
-            Node? old = Interlocked.Exchange(ref tail, node);
-            Interlocked.CompareExchange(ref head, node, null);
-            if (old != null)
-                old.next = node;
+            Write([data]);
         }
 
         public virtual void Write(T[] data)
         {
+            if (consumer != null)
+            {
+                consumer.Write(data);
+                return;
+            }
+
             StreamArgs<T> args = new(data);
             OnData?.Invoke(args);
 
-            if (args.Handled)
-                return;
+            if (!args.Handled)
+                _Write(data);
+        }
 
+        // Bypass event system for internal usage
+        protected void _Write(T[] data)
+        {
             Node ourHead = new(data[0]);
             Node curNode = ourHead;
             for (int i = 1; i < data.Length; i++)
@@ -68,7 +70,7 @@ namespace NuclearVOIP
 
                 return ourNode.data;
             }
-            else 
+            else
                 return default;
         }
 
@@ -108,18 +110,27 @@ namespace NuclearVOIP
             return values;
         }
 
-        public virtual bool Empty()
+        public bool Empty()
         {
             return head == null;
         }
 
-        public virtual int Count()
+        public int Count()
         {
             int count = 0;
             for (Node? curNode = head; curNode != null; curNode = curNode.next)
                 count++;
 
             return count;
+        }
+
+        public void Pipe(InStream<T> stream)
+        {
+            T[]? prefix = Read(Count());
+            if (prefix != null)
+                stream.Write(prefix);
+
+            consumer = stream;
         }
     }
 }

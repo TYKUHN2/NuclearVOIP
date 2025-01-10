@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace NuclearVOIP
 {
-    internal sealed class SampleStream(int freq) // Cannot be GenericStream due to weird processing requirements
+    internal class SampleStream(int freq): OutStream<float> // Reimplemented for speed
     {
         private class Node(float[] samples)
         {
@@ -14,23 +14,40 @@ namespace NuclearVOIP
         private Node? head;
         private Node? tail;
 
-        public delegate void DataHandler(SampleStream listener);
-        public event DataHandler? OnData;
+        private InStream<float>? consumer;
+
+        public event Action<StreamArgs<float>>? OnData;
 
         public readonly int frequency = freq;
 
         public void Write(float[] samples)
         {
-            if (samples.Length == 0)
+            if (consumer != null)
+            {
+                consumer.Write(samples);
                 return;
+            }
 
-            Node node = new(samples);
-            Node? old = Interlocked.Exchange(ref tail, node);
-            Node? oldHead = Interlocked.CompareExchange(ref head, node, null);
-            if (old != null)
-                old.next = node;
+            StreamArgs<float> args = new(samples);
+            OnData?.Invoke(args);
 
-            OnData?.Invoke(this);
+            if (!args.Handled)
+            {
+                if (samples.Length == 0)
+                    return;
+
+                Node node = new(samples);
+                Node? old = Interlocked.Exchange(ref tail, node);
+                Node? _ = Interlocked.CompareExchange(ref head, node, null);
+                if (old != null)
+                    old.next = node;
+            }
+        }
+
+        public float Read()
+        {
+            float[]? samples = Read(1) ?? throw new InvalidOperationException();
+            return samples[0];
         }
 
         public float[]? Read(int numSamples)
@@ -43,15 +60,12 @@ namespace NuclearVOIP
             Node ourHead = head;
 
             Node curNode = ourHead;
-            int lastPos;
             int pos = 0;
             Node? newHead;
             while (true)
             {
                 int toRead = Math.Min(numSamples - pos, curNode.samples.Length);
                 Array.Copy(curNode.samples, 0, buf, pos, toRead);
-
-                lastPos = pos;
                 pos += toRead;
 
                 if (pos < numSamples)
@@ -102,6 +116,15 @@ namespace NuclearVOIP
             }
 
             return count;
+        }
+
+        public void Pipe(InStream<float> stream)
+        {
+            float[]? samples = Read(Count());
+            if (samples != null)
+                stream.Write(samples);
+
+            consumer = stream;
         }
     }
 }

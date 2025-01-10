@@ -1,9 +1,10 @@
-﻿namespace NuclearVOIP
+﻿using System;
+
+namespace NuclearVOIP
 {
     internal interface IStream<I, O>
     {
-        public delegate void DataHandler(IStream<I, O> stream);
-        public event DataHandler? OnData;
+        public event Action<StreamArgs<O>>? OnData;
 
         public abstract void Write(I data);
         public abstract void Write(I[] data);
