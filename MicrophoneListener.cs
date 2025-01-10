@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading;
 using UnityEngine;
 
 namespace NuclearVOIP
@@ -37,9 +36,7 @@ namespace NuclearVOIP
 
         private void OnDestroy()
         {
-            Update(); // Just one more in case we have more data
-            Microphone.End(null);
-            audioClip = null;
+            OnDisable();
         }
 
         private void Update()

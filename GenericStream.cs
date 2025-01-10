@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 
 namespace NuclearVOIP
 {
@@ -68,6 +68,9 @@ namespace NuclearVOIP
 
         public virtual T[]? Read(int num)
         {
+            if (num == 0)
+                return null;
+
             loop:
             if (head == null)
                 return null;

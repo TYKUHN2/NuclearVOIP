@@ -51,7 +51,7 @@ namespace NuclearVOIP
                 {
                     if (sizes[^1] == 255)
                         //throw new ArgumentException("OggStream last segment is continued but there is spare space");
-                        Plugin.Instance!.Logger.LogWarning("OggStream last segment is continued but there is spare space");
+                        Plugin.Logger.LogWarning("OggStream last segment is continued but there is spare space");
                 }
                 
                 if (Finalized || (final && (Interlocked.Exchange(ref _finalized, int.MaxValue) == int.MaxValue))) // Order of operations matter

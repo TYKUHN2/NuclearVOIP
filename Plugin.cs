@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
@@ -9,6 +9,7 @@ using System.IO;
 using BepInEx.Logging;
 using System.Linq;
 using NuclearOption.Networking;
+using UnityEngine;
 
 namespace NuclearVOIP
 {
@@ -28,7 +29,12 @@ namespace NuclearVOIP
             }
         }
 
-        internal new ManualLogSource Logger
+        internal new static ManualLogSource Logger
+        {
+            get { return Instance._Logger; }
+        }
+
+        private ManualLogSource _Logger
         {
             get { return base.Logger; }
         }
@@ -46,8 +52,8 @@ namespace NuclearVOIP
 
             configTalkKey = Config.Bind(
                     "General",
-                    "TalkKey",
-                    new KeyboardShortcut(UnityEngine.KeyCode.V),
+                    "Talk Key",
+                    new KeyboardShortcut(KeyCode.V),
                     "Push to talk key"
                 );
         }

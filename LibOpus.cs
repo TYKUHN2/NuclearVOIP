@@ -16,6 +16,8 @@ namespace NuclearVOIP
         {
             SET_BITRATE = 4002,
             GET_BITRATE = 4003,
+            SET_COMPLEXITY = 4010,
+            GET_COMPLEXITY = 4011,
             SET_INBAND_FEC = 4012,
             GET_INBAND_FEC = 4013,
             SET_PACKET_LOSS_PERC = 4014,
@@ -79,5 +81,11 @@ namespace NuclearVOIP
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr opus_strerror(int err);
+
+
+
+        public class OpusException(int code): Exception("libopus: " + Marshal.PtrToStringAnsi(opus_strerror(code)))
+        {
+        }
     }
 }
