@@ -5,6 +5,8 @@ namespace NuclearVOIP
 {
     public class AbstractStream<T> : InStream<T>, OutStream<T>
     {
+        private InStream<T>? consumer;
+
         protected class Node(T data)
         {
             public readonly T data = data;
@@ -13,8 +15,6 @@ namespace NuclearVOIP
 
         protected Node? head;
         protected Node? tail;
-
-        protected InStream<T>? consumer;
 
         public event Action<StreamArgs<T>>? OnData;
 
@@ -38,7 +38,11 @@ namespace NuclearVOIP
                 _Write(data);
         }
 
-        // Bypass event system for internal usage
+        /// <summary>
+        /// Write to the storage without invoking the event system.
+        /// Designed to be called from derived classes which monitor the event system.
+        /// </summary>
+        /// <param name="data">Data to write</param>
         protected void _Write(T[] data)
         {
             Node ourHead = new(data[0]);

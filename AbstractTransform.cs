@@ -4,8 +4,7 @@ namespace NuclearVOIP
 {
     public abstract class AbstractTransform<I, O>: InStream<I>, OutStream<O>
     {
-        protected readonly AbstractStream<O> storage = new();
-        protected InStream<O>? consumer;
+        private readonly AbstractStream<O> storage = new();
 
         public event Action<StreamArgs<O>>? OnData;
 
@@ -27,6 +26,16 @@ namespace NuclearVOIP
         public virtual void Write(I[] data)
         {
             storage.Write(Transform(data));
+        }
+
+        /// <summary>
+        /// Writes to the underlying storage.
+        /// Designed to be called from a derived class to write outside of Transform.
+        /// </summary>
+        /// <param name="data">Data to write</param>
+        protected virtual void _Write(O[] data)
+        {
+            storage.Write(data);
         }
 
         public virtual O? Read()

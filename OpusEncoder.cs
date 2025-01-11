@@ -184,7 +184,7 @@ namespace NuclearVOIP
                 {
                     Array.Resize(ref leftover, frameSize); // Should never be a frame size or bigger, else would have already encoded
 
-                    storage.Write(EncodeFrame(leftover));
+                    _Write([EncodeFrame(leftover)]);
                 }
             }
             finally
