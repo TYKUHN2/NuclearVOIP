@@ -1,17 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace NuclearVOIP
 {
-    internal class OpusDecoder: IStream<byte[], float>
+    internal class OpusDecoder: AbstractTransform<byte[], float>
     {
         private readonly IntPtr decoder;
-
-        private readonly SampleStream samples = new(48000);
-
-        public event Action<StreamArgs<float>>? OnData;
 
         public OpusDecoder()
         {
@@ -29,40 +24,14 @@ namespace NuclearVOIP
             Marshal.FreeHGlobal(decoder);
         }
 
-        public void Write(byte[] packet)
+        protected override float[] Transform(byte[][] data)
         {
-            float[] decoded = DoDecode(packet);
-            StreamArgs<float> args = new(decoded);
-            OnData?.Invoke(args);
+            float[][] decoded = new float[data.Length][];
+            for (int i = 0; i < data.Length; i++)
+                decoded[i] = DoDecode(data[i]);
 
-            if (!args.Handled)
-                samples.Write(decoded);
+            return decoded.SelectMany(a => a).ToArray();
         }
-
-        public void Write(byte[][] packets)
-        {
-            LinkedList<float[]> list = new();
-            foreach (byte[] packet in packets)
-                list.AddLast(DoDecode(packet));
-
-            float[] decoded = list.SelectMany(a => a).ToArray();
-            StreamArgs<float> args = new(decoded);
-            OnData?.Invoke(args);
-
-            if (!args.Handled)
-                samples.Write(decoded);
-        }
-
-        public float Read()
-        {
-            throw new NotSupportedException();
-        }
-
-        public float[]? Read(int length) => samples.Read(length);
-
-        public bool Empty() => samples.Empty();
-
-        public int Count() => samples.Count();
 
         private float[] DoDecode(byte[] packet)
         {

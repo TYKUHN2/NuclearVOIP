@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -14,8 +12,9 @@ namespace NuclearVOIP
         private bool decoder_good = true;
         private readonly int frameSize;
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
+        private bool closed = false;
 
-        float[] leftover;
+        private float[]? leftover;
 
         public readonly int lookahead;
 
@@ -130,51 +129,42 @@ namespace NuclearVOIP
                 Marshal.FreeHGlobal(decoder);
         }
 
-        private void DoEncode(StreamArgs<float> args)
+        private byte[][] DoEncode(StreamArgs<float> args)
         {
             if (!readLock.WaitOne(0))
-                return;
+                return [];
 
             try
             {
-                LinkedList<byte[]> frames = new();
-                while (parent.Count() >= frameSize)
-                {
-                    float[]? rawFrame = parent.Read(frameSize);
-                    if (rawFrame == null)
-                        return;
+                args.Handle();
 
-                    frames.AddLast(EncodeFrame(rawFrame));
-                }
+                float[] rawFrames = [..leftover, ..args.data];
 
-                if (parent.Count() + args.data.Length >= frameSize)
-                {
-                    args.Handle();
-
-                    float[]? prefix = parent.Read(parent.Count());
-                    float[][] rawFrames = new float[args.data.Length / frameSize + 1][];
-                    rawFrames[0] = [..prefix, ..args.data.Take(frameSize - (prefix?.Length ?? 0))];
-
-                    for (int i = 1; i < rawFrames.Length; i++)
-                        rawFrames[i] = args.data.Skip((i * frameSize) - (prefix?.Length ?? 0)).Take(frameSize).ToArray();
-
-                    if (rawFrames[^1].Length != frameSize)
-                    {
-                        parent.Write(rawFrames[^1]);
-                        Array.Resize(ref rawFrames, rawFrames.Length - 1);
-                    }
-
-                    foreach (float[] rawFrame in rawFrames)
-                        frames.AddLast(EncodeFrame(rawFrame));
-                }
-
-                if (frames.Count() > 0)
-                {
-                    Plugin.Logger.LogDebug("Writing Opus frame(s)");
-                    Write(frames.ToArray());
-                }
+                int mod = rawFrames.Length % frameSize;
+                if (mod == 0)
+                    leftover = null;
                 else
+                {
+                    leftover = rawFrames[^(mod + 1)..];
+                    Array.Resize(ref rawFrames, rawFrames.Length - mod);
+                }
+
+                if (rawFrames.Length == 0)
+                {
                     Plugin.Logger.LogDebug("No Opus frames to write");
+                    return [];
+                }
+
+                byte[][] encoded = new byte[rawFrames.Length / frameSize][];
+                int offset = -frameSize;
+                for (int i = 0; i < encoded.Length; i++)
+                {
+                    offset += frameSize;
+                    encoded[i] = EncodeFrame(rawFrames[offset..(offset + frameSize)]);
+                }
+
+                Plugin.Logger.LogDebug("Writing Opus frame(s)");
+                return encoded;
             }
             finally
             {
@@ -188,27 +178,14 @@ namespace NuclearVOIP
 
             try
             {
-                LinkedList<byte[]> frames = new();
-                int count;
-                while ((count = parent.Count()) > 0)
+                closed = true;
+
+                if (leftover != null)
                 {
-                    float[]? rawFrame = parent.Read(count > frameSize ? frameSize : count);
-                    if (rawFrame == null)
-                        return;
+                    Array.Resize(ref leftover, frameSize); // Should never be a frame size or bigger, else would have already encoded
 
-                    if (rawFrame.Length < frameSize)
-                        Array.Resize(ref rawFrame, frameSize);
-
-                    frames.AddLast(EncodeFrame(rawFrame));
+                    storage.Write(EncodeFrame(leftover));
                 }
-
-                if (frames.Count() > 0)
-                {
-                    Plugin.Logger.LogDebug("Writing Opus frame(s)");
-                    Write(frames.ToArray());
-                }
-                else
-                    Plugin.Logger.LogDebug("No Opus frames to write");
             }
             finally
             {
@@ -216,22 +193,12 @@ namespace NuclearVOIP
             }
         }
 
-        protected override byte[][] Transform(float[] data)
+        override protected byte[][] Transform(float[] samples)
         {
-            float[] rawFrame = [.. leftover, ..data];
-            byte[][] frames = new byte[rawFrame.Length / frameSize][];
+            if (closed)
+                throw new InvalidOperationException("OpusEncoder was closed");
 
-            for (int i = 0; i < frames.Length; i++)
-            {
-                int offset = i * frameSize;
-                frames[i] = EncodeFrame(rawFrame[offset..(offset + frameSize)]);
-            }
-
-            int leftoverSize = rawFrame.Length % frameSize;
-            if (leftoverSize != 0)
-                leftover = rawFrame[^(leftoverSize + 1)..];
-
-            return frames;
+            return DoEncode(new(samples));
         }
 
         private unsafe byte[] EncodeFrame(float[] samples)
@@ -266,7 +233,7 @@ namespace NuclearVOIP
 
                         if (Math.Abs(error) > 0.2)
                         {
-                            ValidationException exception = new ValidationException(samples[i], decoded[i]);
+                            ValidationException exception = new(samples[i], decoded[i]);
                             //throw exception;
                             Plugin.Logger.LogWarning($"Error: {exception.Message} error = {error}. Disabling verification.");
                             decoder_good = false;

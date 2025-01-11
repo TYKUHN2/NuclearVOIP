@@ -5,21 +5,21 @@ using System.Threading;
 
 namespace NuclearVOIP
 {
-    internal class OggOpus: GenericStream<byte[]>, IDisposable
+    internal class OggOpus: AbstractStream<byte[]>, IDisposable
     {
         private static ReadOnlySpan<byte> EncoderVendor => "NUCLEARVOIP"u8;
-        private readonly FrameStream frames = new();
+        private readonly AbstractStream<byte[]> frames = new();
         private readonly Ogg.Stream oggStream;
         private readonly int samplesPerFrame;
         private int granulePos = 0;
 
         public readonly OpusEncoder encoder;
 
-        public OggOpus(Ogg file, SampleStream parent, byte channels, int msPerPacket)
+        public OggOpus(Ogg file, int frequency, byte channels, int msPerPacket)
         {
             oggStream = new Ogg.Stream(file);
             samplesPerFrame = msPerPacket * 48;
-            encoder = new(parent);
+            encoder = new(frequency);
             base.Write(EncodeOpusHeaders(channels, (short)encoder.lookahead));
 
             frames.OnData += OnFrame;
@@ -51,7 +51,7 @@ namespace NuclearVOIP
             base.Write(EncodeOpus(data, false));
         }
 
-        public void Dispose() => Flush();
+        public void Dispose() => Close();
 
         public void Close() 
         {
@@ -182,7 +182,7 @@ namespace NuclearVOIP
             return pages;
         }
 
-        private class FrameStream: GenericStream<byte[]>
+        /*private class FrameStream: GenericStream<byte[]>
         {
             public int SafeBytes()
             {
@@ -196,6 +196,6 @@ namespace NuclearVOIP
 
                 return count;
             }
-        }
+        }*/
     }
 }
