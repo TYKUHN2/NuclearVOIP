@@ -3,11 +3,12 @@ using UnityEngine;
 
 namespace NuclearVOIP
 {
-    internal class StreamClip<T>
+    internal class StreamClip: InStream<float>
     {
+        private readonly SampleStream buffer = new(48000);
         private const int bufferSamples = (int)((48000 * 0.02) * 3); // 3, 20ms packets at 48khz
+        private bool ready = false;
 
-        private readonly IStream<T, float> parent;
         public readonly AudioClip clip;
 
         //private int pos = 0;
@@ -16,16 +17,16 @@ namespace NuclearVOIP
         public event Action? OnReady;
         public event Action? OnDry;
 
-        private bool ready = false;
-
-        public StreamClip(IStream<T, float> stream, string name) {
-            parent = stream;
+        public StreamClip(string name) {
             clip = AudioClip.Create(name, 24000, 1, 48000, true, OnRead);
-
-            stream.OnData += OnData;
         }
 
-        private void OnData(StreamArgs<float> args)
+        public void Write(float sample) // Very inefficient, don't use this
+        {
+            Write([sample]);
+        }
+
+        public void Write(float[] samples)
         {
             /*float[]? samples = parent.Read(parent.Count());
             if (samples == null)
@@ -50,7 +51,9 @@ namespace NuclearVOIP
                 OnReady?.Invoke();
             }*/
 
-            if (parent.Count() > bufferSamples && !ready)
+            buffer.Write(samples);
+
+            if (buffer.Count() > bufferSamples && !ready)
             {
                 ready = true;
                 OnReady?.Invoke();
@@ -61,7 +64,7 @@ namespace NuclearVOIP
         {
             Array.Clear(data, 0, data.Length);
 
-            float[]? samples = parent.Read(Math.Min(data.Length, parent.Count()));
+            float[]? samples = buffer.Read(Math.Min(data.Length, buffer.Count()));
             if (samples == null)
             {
                 ready = false;

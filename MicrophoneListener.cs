@@ -1,17 +1,47 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace NuclearVOIP
 {
-    internal class MicrophoneListener: MonoBehaviour
+    internal class MicrophoneListener: MonoBehaviour, OutStream<float>
     {
         class MicrophoneError(): Exception("microphone initialization failure");
 
         private AudioClip? audioClip;
         private int pos = 0;
+        private readonly SampleStream stream = new(48000);
 
-        public readonly SampleStream stream = new(48000);
+        public event Action<StreamArgs<float>>? OnData;
         public int frequency = 48000;
+        public MicrophoneListener()
+        {
+            stream.OnData += (args) => { OnData?.Invoke(args); };
+        }
+
+        public float Read()
+        {
+            return stream.Read();
+        }
+
+        public float[]? Read(int num)
+        {
+            return stream.Read(num);
+        }
+
+        public bool Empty()
+        {
+            return stream.Empty();
+        }
+
+        public int Count()
+        {
+            return stream.Count();
+        }
+
+        public void Pipe(InStream<float>? other)
+        {
+            stream.Pipe(other);
+        }
 
         private void Awake()
         {
