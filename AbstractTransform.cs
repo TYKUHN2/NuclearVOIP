@@ -9,7 +9,7 @@ namespace NuclearVOIP
 
         public event Action<StreamArgs<O>>? OnData;
 
-        AbstractTransform()
+        public AbstractTransform()
         {
             storage.OnData += _OnData;
         }
@@ -49,7 +49,7 @@ namespace NuclearVOIP
             return storage.Count();
         }
 
-        public void Pipe(InStream<O> stream)
+        public void Pipe(InStream<O>? stream)
         {
             storage.Pipe(stream);
         }

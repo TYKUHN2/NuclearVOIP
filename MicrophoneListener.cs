@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 namespace NuclearVOIP
@@ -11,6 +11,7 @@ namespace NuclearVOIP
         private int pos = 0;
 
         public readonly SampleStream stream = new(48000);
+        public int frequency = 48000;
 
         private void Awake()
         {

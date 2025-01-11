@@ -28,8 +28,9 @@ namespace NuclearVOIP
 
             if (listener!.enabled && (talkKey.IsDown() || allTalkKey.IsDown()))
             {
-                encoder = new(listener.stream);
+                encoder = new(listener.frequency);
                 encoder.OnData += _OnData;
+                listener.Pipe(encoder);
 
                 listener.enabled = true;
 
@@ -39,6 +40,8 @@ namespace NuclearVOIP
             {
                 listener!.enabled = false;
                 encoder = null;
+
+                listener.Pipe(null);
             }
         }
 

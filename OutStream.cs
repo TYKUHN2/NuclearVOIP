@@ -14,6 +14,6 @@ namespace NuclearVOIP
         }
 
         abstract int Count();
-        abstract void Pipe(InStream<T> stream);
+        abstract void Pipe(InStream<T>? stream);
     }
 }

@@ -124,13 +124,18 @@ namespace NuclearVOIP
             return count;
         }
 
-        public void Pipe(InStream<T> stream)
+        public void Pipe(InStream<T>? stream)
         {
-            T[]? prefix = Read(Count());
-            if (prefix != null)
-                stream.Write(prefix);
+            if (stream == null)
+                consumer = null;
+            else
+            {
+                T[]? prefix = Read(Count());
+                if (prefix != null)
+                    stream.Write(prefix);
 
-            consumer = stream;
+                consumer = stream;
+            }
         }
     }
 }
