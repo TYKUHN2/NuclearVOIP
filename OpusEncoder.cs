@@ -138,22 +138,19 @@ namespace NuclearVOIP
             {
                 args.Handle();
 
-                float[] rawFrames = [..leftover, ..args.data];
+                float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
                 int mod = rawFrames.Length % frameSize;
                 if (mod == 0)
                     leftover = null;
                 else
                 {
-                    leftover = rawFrames[^(mod + 1)..];
+                    leftover = rawFrames[^mod..];
                     Array.Resize(ref rawFrames, rawFrames.Length - mod);
                 }
 
                 if (rawFrames.Length == 0)
-                {
-                    Plugin.Logger.LogDebug("No Opus frames to write");
                     return [];
-                }
 
                 byte[][] encoded = new byte[rawFrames.Length / frameSize][];
                 int offset = -frameSize;
@@ -163,7 +160,6 @@ namespace NuclearVOIP
                     encoded[i] = EncodeFrame(rawFrames[offset..(offset + frameSize)]);
                 }
 
-                Plugin.Logger.LogDebug("Writing Opus frame(s)");
                 return encoded;
             }
             finally
