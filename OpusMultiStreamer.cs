@@ -1,4 +1,4 @@
-using Steamworks;
+﻿using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -60,6 +60,7 @@ namespace NuclearVOIP
             this.networking = networking;
 
             comms.OnData += OnData;
+            comms.OnTarget += (Target target) => { CurTarget = target; };
             networking.OnPacket += Parse;
         }
 

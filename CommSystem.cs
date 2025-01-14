@@ -15,6 +15,7 @@ namespace NuclearVOIP
         private readonly Dictionary<CSteamID, StreamPlayer> players = [];
 
         public event Action<byte[][]>? OnData;
+        public event Action<OpusMultiStreamer.Target>? OnTarget;
 
         public void Awake()
         {
@@ -26,8 +27,10 @@ namespace NuclearVOIP
             KeyboardShortcut talkKey = Plugin.Instance.configTalkKey.Value;
             KeyboardShortcut allTalkKey = Plugin.Instance.configAllTalkKey.Value;
 
-            if (listener!.enabled && (talkKey.IsDown() || allTalkKey.IsDown()))
+            if (!listener!.enabled && (talkKey.IsDown() || allTalkKey.IsDown()))
             {
+                Plugin.Logger.LogDebug("Activating microphone");
+
                 encoder = new(listener.frequency);
                 encoder.OnData += _OnData;
                 listener.Pipe(encoder);
@@ -35,13 +38,18 @@ namespace NuclearVOIP
                 listener.enabled = true;
 
                 activeKey = talkKey.IsDown() ? talkKey : allTalkKey;
+
+                OnTarget?.Invoke(talkKey.IsDown() ? OpusMultiStreamer.Target.TEAM : OpusMultiStreamer.Target.GLOBAL);
             }
             else if (activeKey?.IsUp() == true)
             {
+                Plugin.Logger.LogDebug("Deactivating microphone");
+
                 listener!.enabled = false;
                 encoder = null;
 
                 listener.Pipe(null);
+                OnTarget?.Invoke(OpusMultiStreamer.Target.STOPPED);
             }
         }
 
@@ -54,10 +62,12 @@ namespace NuclearVOIP
 
         internal Action<byte[][]> NewStream(CSteamID player)
         {
+            Plugin.Logger.LogDebug($"CommSystem: New stream {player.m_SteamID}");
+
             if (players.ContainsKey(player))
                 Plugin.Logger.LogWarning("Received a new stream from a client with an already open stream");
 
-            StreamPlayer sPlayer = new();
+            StreamPlayer sPlayer = gameObject.AddComponent<StreamPlayer>();
             players[player] = sPlayer;
 
             return (byte[][] opusPackets) =>
@@ -68,6 +78,8 @@ namespace NuclearVOIP
 
         internal void DestroyStream(CSteamID player)
         {
+            Plugin.Logger.LogDebug($"CommSystem: Stream destroyed {player.m_SteamID}");
+
             if (!players.TryGetValue(player, out StreamPlayer sPlayer))
             {
                 Plugin.Logger.LogWarning("Nonexistent stream was closed");
