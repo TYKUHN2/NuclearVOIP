@@ -4,10 +4,7 @@ using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
 using System;
 using System.Threading;
-using NuclearOption.SavedMission;
 using BepInEx.Logging;
-using NuclearOption.Networking;
-using Mirage;
 using Steamworks;
 using UnityEngine;
 
@@ -46,6 +43,8 @@ namespace NuclearVOIP
 
         internal readonly ConfigEntry<int> configVOIPPort;
 
+        internal readonly bool NET_DEBUG = true;
+
         Plugin()
         {
             if (Interlocked.CompareExchange(ref _Instance, this, null) != null) // I like being thread safe okay?
@@ -72,7 +71,7 @@ namespace NuclearVOIP
                     "The port to discover and transmit voice chat on"
                 );
 
-            LoadingManager.NetworkReady += LateLoad;
+            LoadingManager.GameLoaded += LateLoad;
         }
 
         ~Plugin()
@@ -121,10 +120,16 @@ namespace NuclearVOIP
         private void LoadingFinished()
         {
             GameObject host = GameManager.LocalPlayer.gameObject;
-            NetworkSystem networking = host.AddComponent<NetworkSystem>();
+            INetworkSystem networkSystem;
+
+            if (NET_DEBUG && GameManager.gameState == GameManager.GameState.Singleplayer)
+                networkSystem = host.AddComponent<DebugNetworkSystem>();
+            else
+                networkSystem = host.AddComponent<NetworkSystem>();
+
             CommSystem comms = host.AddComponent<CommSystem>();
 
-            streamer = new(comms, networking);
+            streamer = new(comms, networkSystem);
         }
     }
 }

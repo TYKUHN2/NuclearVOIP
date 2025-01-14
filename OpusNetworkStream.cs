@@ -21,6 +21,9 @@ namespace NuclearVOIP
         {
             get
             {
+                if (pos == 0 || lost == 0)
+                    return 0;
+
                 return (byte)((100 * lost) / pos);
             }
         }

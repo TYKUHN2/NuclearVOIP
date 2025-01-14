@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace NuclearVOIP
 {
-    internal class NetworkSystem: MonoBehaviour
+    internal class NetworkSystem: MonoBehaviour, INetworkSystem
     {
         private readonly int channel = Plugin.Instance.configVOIPPort.Value;
         private readonly List<SteamNetworkingIdentity> connections = [];
@@ -50,7 +50,7 @@ namespace NuclearVOIP
             }
         }
 
-        private unsafe void FixedUpdate()
+        private void FixedUpdate()
         {
             elapsed += Time.fixedDeltaTime;
 
@@ -99,7 +99,7 @@ namespace NuclearVOIP
 
                         packets.Add((message->m_identityPeer, packet));
 
-                        message->Release();
+                        SteamNetworkingMessage_t.Release((IntPtr)message);
                     }
                 }
 

@@ -1,4 +1,4 @@
-﻿using Steamworks;
+using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,7 +23,7 @@ namespace NuclearVOIP
         }
 
         private readonly CommSystem comms;
-        private readonly NetworkSystem networking;
+        private readonly INetworkSystem networking;
         private readonly Dictionary<CSteamID, OpusNetworkStream> streams = [];
         private ushort pos = 0;
 
@@ -54,7 +54,7 @@ namespace NuclearVOIP
             }
         }
 
-        public OpusMultiStreamer(CommSystem comms, NetworkSystem networking)
+        public OpusMultiStreamer(CommSystem comms, INetworkSystem networking)
         {
             this.comms = comms;
             this.networking = networking;
@@ -100,7 +100,7 @@ namespace NuclearVOIP
             if (target == Target.STOPPED)
                 return;
 
-            int totalLen = (packets.Length << 1) + 2;
+            int totalLen = (packets.Length << 1) + 3;
             foreach (byte[] packet in packets)
                 totalLen += packet.Length;
 
@@ -113,7 +113,7 @@ namespace NuclearVOIP
             writer.Write(pos++);
             foreach (byte[] packet in packets)
             {
-                writer.Write(packet.Length);
+                writer.Write((ushort)packet.Length);
                 writer.Write(packet);
             }
 

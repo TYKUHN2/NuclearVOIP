@@ -25,7 +25,7 @@ namespace NuclearVOIP
 
         public virtual void Write(I[] data)
         {
-            storage.Write(Transform(data));
+            _Write(Transform(data));
         }
 
         /// <summary>
