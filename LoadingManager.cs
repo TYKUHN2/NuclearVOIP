@@ -2,6 +2,7 @@
 using Mirage;
 using NuclearOption.Networking;
 using System;
+using System.Reflection;
 
 namespace NuclearVOIP
 {
@@ -20,14 +21,28 @@ namespace NuclearVOIP
             Harmony harmony = new("xyz.tyknet.NuclearOption");
 
             Type netManager = typeof(NetworkManagerNuclearOption);
-            harmony.Patch(netManager.GetMethod("Awake"), null, new(thisType.GetMethod(nameof(NetworkManagerPostfix))));
+            harmony.Patch(
+                netManager.GetMethod("Awake"),
+                null, 
+                HookMethod(NetworkManagerPostfix)
+            );
 
             Type mainMenu = typeof(MainMenu);
-            harmony.Patch(mainMenu.GetMethod("Start"), null, new(thisType.GetMethod(nameof(MainMenuPostfix))));
+            harmony.Patch(
+                mainMenu.GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance),
+                null,
+                HookMethod(MainMenuPostfix)
+            );
+        }
+
+        private static HarmonyMethod HookMethod(Delegate hook)
+        {
+            return new HarmonyMethod(hook.GetMethodInfo());
         }
 
         private static void MainMenuPostfix()
         {
+            Plugin.Logger.LogDebug("Reached GameLoaded");
             GameLoaded?.Invoke();
         }
 
@@ -36,11 +51,13 @@ namespace NuclearVOIP
             NetworkManagerNuclearOption.i.Client.Connected.AddListener(ClientConnectCallback);
             NetworkManagerNuclearOption.i.Client.Disconnected.AddListener(ClientDisconectCallback);
 
+            Plugin.Logger.LogDebug("Reached NetworkReady");
             NetworkReady?.Invoke();
         }
 
         private static void MissionLoadCallback()
         {
+            Plugin.Logger.LogDebug("Reached MissionLoaded");
             MissionLoaded?.Invoke();
         }
 
@@ -56,6 +73,7 @@ namespace NuclearVOIP
 
         private static void ClientDisconectCallback(ClientStoppedReason reason)
         {
+            Plugin.Logger.LogDebug("Reached MissionUnloaded");
             MissionUnloaded?.Invoke();
         }
     }
