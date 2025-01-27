@@ -119,17 +119,20 @@ namespace NuclearVOIP
 
         private void LoadingFinished()
         {
-            GameObject host = GameManager.LocalPlayer.gameObject;
-            INetworkSystem networkSystem;
+            if (NET_DEBUG || GameManager.gameState != GameManager.GameState.Singleplayer)
+            {
+                GameObject host = GameManager.LocalPlayer.gameObject;
+                INetworkSystem networkSystem;
 
-            if (NET_DEBUG && GameManager.gameState == GameManager.GameState.Singleplayer)
-                networkSystem = host.AddComponent<DebugNetworkSystem>();
-            else
-                networkSystem = host.AddComponent<NetworkSystem>();
+                if (NET_DEBUG && GameManager.gameState == GameManager.GameState.Singleplayer)
+                    networkSystem = host.AddComponent<DebugNetworkSystem>();
+                else
+                    networkSystem = host.AddComponent<NetworkSystem>();
 
-            CommSystem comms = host.AddComponent<CommSystem>();
+                CommSystem comms = host.AddComponent<CommSystem>();
 
-            streamer = new(comms, networkSystem);
+                streamer = new(comms, networkSystem);
+            }
         }
     }
 }
