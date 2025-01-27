@@ -31,6 +31,12 @@ namespace NuclearVOIP
             GET_LSB_DEPTH = 4037
         }
 
+        public enum DecoderCtl
+        {
+            SET_GAIN = 4034,
+            GET_GAIN = 4045
+        }
+
         public enum Signal
         {
             AUTO = -1000,
@@ -52,7 +58,7 @@ namespace NuclearVOIP
         public static extern int opus_encoder_init(IntPtr encoder, int freq, int channels, int mode);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
-        public static extern unsafe int opus_encode_float(IntPtr encoder, float[] pcm, int frame_size, byte[] data, int max_data_bytes);
+        public static extern int opus_encode_float(IntPtr encoder, float[] pcm, int frame_size, byte[] data, int max_data_bytes);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int opus_encoder_ctl(IntPtr encoder, int req, int val); // vararg not fun

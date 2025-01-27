@@ -8,6 +8,18 @@ namespace NuclearVOIP
     {
         private readonly IntPtr decoder;
 
+        public int Gain
+        {
+            get
+            {
+                return GetCtl(LibOpus.DecoderCtl.GET_GAIN);
+            }
+            set
+            {
+                SetCtl(LibOpus.DecoderCtl.SET_GAIN, value);
+            }
+        }
+
         public OpusDecoder()
         {
             decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
@@ -46,6 +58,29 @@ namespace NuclearVOIP
 
             Array.Resize(ref decoded, err);
             return decoded;
+        }
+
+        private void SetCtl(LibOpus.DecoderCtl ctl, int val)
+        {
+            int err = LibOpus.opus_decoder_ctl(decoder, (int)ctl, val);
+            if (err != 0)
+            {
+                Marshal.FreeHGlobal(decoder);
+                throw new LibOpus.OpusException(err);
+            }
+        }
+
+        private unsafe int GetCtl(LibOpus.DecoderCtl ctl)
+        {
+            int err = LibOpus.opus_decoder_ctl(decoder, (int)ctl, out int result);
+
+            if (err != 0)
+            {
+                Marshal.FreeHGlobal(decoder);
+                throw new LibOpus.OpusException(err);
+            }
+
+            return result;
         }
     }
 }
