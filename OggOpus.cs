@@ -23,12 +23,7 @@ namespace NuclearVOIP
             base.Write(EncodeOpusHeaders(channels, (short)encoder.lookahead));
 
             frames.OnData += OnFrame;
-            encoder.OnData += OnParent;
-        }
-
-        ~OggOpus()
-        {
-            encoder.OnData -= OnParent;
+            encoder.Pipe(this);
         }
 
         public override void Write(byte[] data)
@@ -63,12 +58,6 @@ namespace NuclearVOIP
             base.Write(EncodeOpus(data, true));
         }
 
-        private void OnParent(StreamArgs<byte[]> args)
-        {
-            args.Handle();
-            frames.Write(args.data);
-        }
-
         private void OnFrame(StreamArgs<byte[]> args)
         {
             int count = frames.Count();
@@ -77,7 +66,8 @@ namespace NuclearVOIP
 
             args.Handle();
 
-            byte[][]? buf = [..frames.Read(count), ..(args.data[..^2])];
+            byte[][]? prefix = frames.Read(count);
+            byte[][]? buf = prefix == null ? args.data[..^1] : [..prefix, ..(args.data[..^1])];
             base.Write(EncodeOpus(buf, false));
 
             frames.Write(args.data[^1]);
@@ -181,21 +171,5 @@ namespace NuclearVOIP
 
             return pages;
         }
-
-        /*private class FrameStream: GenericStream<byte[]>
-        {
-            public int SafeBytes()
-            {
-                Node? curNode = head;
-                int count = 0;
-                while (curNode?.next != null)
-                {
-                    count += curNode.data.Length;
-                    curNode = curNode.next;
-                }
-
-                return count;
-            }
-        }*/
     }
 }
