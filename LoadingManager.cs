@@ -2,12 +2,15 @@
 using Mirage;
 using NuclearOption.Networking;
 using System;
+using System.Linq;
 using System.Reflection;
 
 namespace NuclearVOIP
 {
     public class LoadingManager
     {
+        private static readonly Harmony harmony = new("xyz.tyknet.NuclearOption");
+
         public static event Action? GameLoaded;
         public static event Action? NetworkReady;
 
@@ -17,8 +20,6 @@ namespace NuclearVOIP
         static LoadingManager()
         {
             Type thisType = typeof(LoadingManager);
-
-            Harmony harmony = new("xyz.tyknet.NuclearOption");
 
             Type netManager = typeof(NetworkManagerNuclearOption);
             harmony.Patch(
@@ -44,6 +45,9 @@ namespace NuclearVOIP
         {
             Plugin.Logger.LogDebug("Reached GameLoaded");
             GameLoaded?.Invoke();
+            
+            MethodBase original = harmony.GetPatchedMethods().Where(a => a.DeclaringType == typeof(MainMenu)).First();
+            harmony.Unpatch(original, HookMethod(MainMenuPostfix).method);
         }
 
         private static void NetworkManagerPostfix()
