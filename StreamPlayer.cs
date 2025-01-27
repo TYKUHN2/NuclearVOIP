@@ -4,24 +4,26 @@ namespace NuclearVOIP
 {
     internal class StreamPlayer: MonoBehaviour
     {
-        private readonly StreamClip clip;
+        private StreamClip? clip;
         private AudioSource? source;
 
         public readonly OpusDecoder decoder = new();
 
-        public StreamPlayer()
-        {
-            clip = new StreamClip("NuclearVOIP.StreamPlayer");
-            decoder.Pipe(clip);
-        }
-
         void Awake()
         {
             source = gameObject.AddComponent<AudioSource>();
-            source.clip = clip.clip;
+            clip = gameObject.AddComponent<StreamClip>();
 
             clip.OnReady += () => { source.Play(); };
             clip.OnDry += () => { source.Pause(); };
+
+            decoder.Pipe(clip);
+        }
+
+        void OnDestroy()
+        {
+            Destroy(clip);
+            Destroy(source);
         }
     }
 }
