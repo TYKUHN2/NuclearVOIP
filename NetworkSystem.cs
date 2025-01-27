@@ -10,6 +10,8 @@ namespace NuclearVOIP
 {
     internal class NetworkSystem: MonoBehaviour, INetworkSystem
     {
+        private const float INTERVAL = 0.02f;
+
         private readonly int channel = Plugin.Instance.configVOIPPort.Value;
         private readonly List<SteamNetworkingIdentity> connections = [];
         private float elapsed = 0;
@@ -17,6 +19,7 @@ namespace NuclearVOIP
         private readonly Callback<SteamNetworkingMessagesSessionRequest_t> sessionReq;
         private readonly Callback<SteamNetworkingMessagesSessionFailed_t> messageFailed;
 
+        public event Action<CSteamID>? NewConnection;
         public event Action<CSteamID, byte[]>? OnPacket;
         public event Action<CSteamID>? ConnectionLost;
 
@@ -28,6 +31,9 @@ namespace NuclearVOIP
             Player[] players = [..UnitRegistry.playerLookup.Values];
             foreach (Player player in players)
             {
+                if (player == GameManager.LocalPlayer)
+                    continue;
+
                 SteamNetworkingIdentity target = new()
                 {
                     m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID
@@ -54,27 +60,41 @@ namespace NuclearVOIP
         {
             elapsed += Time.fixedDeltaTime;
 
-            if (elapsed > 10)
+            if (elapsed >= INTERVAL)
             {
-                elapsed -= 10;
+                elapsed -= INTERVAL;
                 for (int i = 0; i < connections.Count; i++)
                 {
                     SteamNetworkingIdentity identity = connections[i];
-                    ESteamNetworkingConnectionState state = SteamNetworkingMessages.GetSessionConnectionInfo(
+                    Player peer = UnitRegistry.playerLookup
+                        .Where(a => a.Value.SteamID == identity.GetSteamID64())
+                        .First()
+                        .Value;
+
+                    if (ChatManager.IsMuted(peer))
+                    {
+                        SteamNetworkingMessages.CloseChannelWithUser(ref identity, channel);
+
+                        ConnectionLost?.Invoke(identity.GetSteamID());
+                    } 
+                    else
+                    {
+                        ESteamNetworkingConnectionState state = SteamNetworkingMessages.GetSessionConnectionInfo(
                         ref identity,
                         out SteamNetConnectionInfo_t info,
                         out SteamNetConnectionRealTimeStatus_t status
                         );
 
-                    if (state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ||
-                        state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)
-                    {
-                        OnDisconnect(identity);
+                        if (state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ||
+                            state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)
+                        {
+                            OnDisconnect(identity);
 
-                        continue;
+                            continue;
+                        }
+
+                        // Later I'll add something about packet loss and ping here.
                     }
-
-                    // Later I'll add something about packet loss and ping here.
                 }
             }
 
@@ -111,6 +131,17 @@ namespace NuclearVOIP
 
                 if (received < cPlayers)
                     break;
+            }
+        }
+
+        public void Disconnect(CSteamID player)
+        {
+            SteamNetworkingIdentity conn = connections.Find(a => a.GetSteamID() == player);
+
+            if (!conn.Equals(default))
+            {
+                connections.Remove(conn);
+                SteamNetworkingMessages.CloseChannelWithUser(ref conn, channel);
             }
         }
 
@@ -153,8 +184,11 @@ namespace NuclearVOIP
 
         private void OnSession(SteamNetworkingMessagesSessionRequest_t request)
         {
-            bool found = NetworkManagerNuclearOption.i.GamePlayers.Any(a => a.SteamID == request.m_identityRemote.GetSteamID64());
-            if (found)
+            Player? player = NetworkManagerNuclearOption.i.GamePlayers
+                .Where(a => a.SteamID == request.m_identityRemote.GetSteamID64())
+                .FirstOrDefault();
+
+            if (player != null && !ChatManager.IsMuted(player)) // TODO: When a player is unmuted (might need a patch) retry connection
                 SteamNetworking.AcceptP2PSessionWithUser(request.m_identityRemote.GetSteamID());
             else
                 Plugin.Logger.LogWarning("Received P2P request from random user");

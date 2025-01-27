@@ -14,6 +14,7 @@ namespace NuclearVOIP
         private readonly HSteamNetConnection send;
         private readonly HSteamNetConnection recv;
 
+        public event Action<CSteamID>? NewConnection;
         public event Action<CSteamID, byte[]>? OnPacket;
         public event Action<CSteamID>? ConnectionLost;
 
@@ -47,8 +48,6 @@ namespace NuclearVOIP
             {
                 List<byte[]> packets = [];
                 int received = SteamNetworkingSockets.ReceiveMessagesOnConnection(recv, pointers, 2);
-                if (received > 0)
-                    Plugin.Logger.LogDebug($"DebugNetworkSystem: Received {received} messages");
 
                 for (int i = 0; i < received; i++)
                 {
@@ -79,21 +78,23 @@ namespace NuclearVOIP
             }
         }
 
+        public void Disconnect(CSteamID steamID)
+        {
+
+        }
+
         public void SendToTeam(byte[] data)
         {
-            Plugin.Logger.LogDebug("DebugNetworkSystem: SendToTeam");
             Send(data);
         }
 
         public void SendToAll(byte[] data)
         {
-            Plugin.Logger.LogDebug("DebugNetworkSystem: SendToAll");
             Send(data);
         }
 
         public void SendTo(CSteamID target, byte[] data)
         {
-            Plugin.Logger.LogDebug($"DebugNetworkSystem: SendTo {target}");
             Send(data);
         }
 
