@@ -3,22 +3,18 @@ using UnityEngine;
 
 namespace NuclearVOIP
 {
-    internal class StreamClip: InStream<float>
+    [RequireComponent(typeof(AudioSource))]
+    internal class StreamClip: MonoBehaviour, InStream<float>
     {
         private readonly SampleStream buffer = new(48000);
         private const int bufferSamples = (int)((48000 * 0.02) * 3); // 3, 20ms packets at 48khz
-        private bool ready = false;
-
-        public readonly AudioClip clip;
-
-        //private int pos = 0;
-        //private int avail = 0;
 
         public event Action? OnReady;
         public event Action? OnDry;
 
-        public StreamClip(string name) {
-            clip = AudioClip.Create(name, 24000, 1, 48000, true, OnRead);
+        private void Awake()
+        {
+            enabled = false;
         }
 
         public void Write(float sample) // Very inefficient, don't use this
@@ -28,51 +24,50 @@ namespace NuclearVOIP
 
         public void Write(float[] samples)
         {
-            /*float[]? samples = parent.Read(parent.Count());
-            if (samples == null)
-                return;
-
-            int rPos;
-            int nPos;
-            do
-            {
-                rPos = pos;
-                nPos = rPos + samples.Length;
-                if (nPos > clip.samples)
-                    nPos -= clip.samples;
-            } while (Interlocked.CompareExchange(ref pos, nPos, rPos) == rPos);
-
-            clip.SetData(samples, rPos);
-
-            Interlocked.Add(ref avail, samples.Length);
-            if (avail >= bufferSamples && !ready)
-            {
-                ready = true;
-                OnReady?.Invoke();
-            }*/
-
             buffer.Write(samples);
 
-            if (buffer.Count() > bufferSamples && !ready)
+            if (buffer.Count() > bufferSamples && !enabled)
             {
-                ready = true;
+                enabled = true;
                 OnReady?.Invoke();
             }
         }
 
-        private void OnRead(float[] data)
+        // Runs on a different thread, suddenly really happy I made the Streams threadsafe.
+        private void OnAudioFilterRead(float[] data, int channels)
         {
-            Array.Clear(data, 0, data.Length);
+            int perChannel = data.Length / channels;
+            int count = buffer.Count();
 
-            float[]? samples = buffer.Read(Math.Min(data.Length, buffer.Count()));
+            if (count < perChannel)
+            {
+                Plugin.Logger.LogDebug("StreamClip Dry");
+
+                enabled = false;
+                OnDry?.Invoke();
+
+                if (count == 0)
+                    return;
+            }
+
+            float[]? samples = buffer.Read(Math.Min(perChannel, count));
+
             if (samples == null)
             {
-                ready = false;
+                Plugin.Logger.LogDebug("StreamClip Dry");
+
+                enabled = false;
                 OnDry?.Invoke();
                 return;
             }
 
-            samples.CopyTo(data, 0);
+            for (int i = 0; i < samples.Length; i++)
+            {
+                int offset = i * channels;
+
+                for (int j = 0; j < channels; j++)
+                    data[offset + j] += samples[i];
+            }
         }
     }
 }
