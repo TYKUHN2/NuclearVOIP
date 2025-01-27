@@ -6,7 +6,7 @@ namespace NuclearVOIP
 {
     internal class OpusEncoder: AbstractTransform<float, byte[]>
     {
-        private const bool DECODER_TEST = true;
+        private const bool DECODER_TEST = false;
         private readonly IntPtr encoder;
         private readonly IntPtr decoder;
         private bool decoder_good = true;
@@ -214,7 +214,7 @@ namespace NuclearVOIP
 
                 if (err < 0)
                 {
-                    Plugin.Logger.LogWarning("WARNING: Decoder failure when verifying encoding. Disabling verification.");
+                    Plugin.Logger.LogWarning("Decoder failure when verifying encoding. Disabling verification.");
                     decoder_good = false;
                 }
                 else
@@ -231,7 +231,7 @@ namespace NuclearVOIP
                         {
                             ValidationException exception = new(samples[i], decoded[i]);
                             //throw exception;
-                            Plugin.Logger.LogWarning($"Error: {exception.Message} error = {error}. Disabling verification.");
+                            Plugin.Logger.LogWarning($"{exception.Message} error = {error}. Disabling verification.");
                             decoder_good = false;
                         }
                     }
