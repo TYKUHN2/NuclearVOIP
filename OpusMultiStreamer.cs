@@ -1,5 +1,6 @@
 ﻿using Steamworks;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 
@@ -7,8 +8,11 @@ namespace NuclearVOIP
 {
     internal class OpusMultiStreamer
     {
+        private const ushort VERSION = 0;
+
         private enum Commands: byte
         {
+            HANDSHAKE,
             START,
             DATA,
             STOP,
@@ -62,6 +66,11 @@ namespace NuclearVOIP
             comms.OnData += OnData;
             comms.OnTarget += (Target target) => { CurTarget = target; };
             networking.OnPacket += Parse;
+            networking.ConnectionLost += EndStream;
+            networking.NewConnection += (CSteamID player) =>
+            {
+                networking.SendTo(player, [(byte)Commands.HANDSHAKE, .. (BitConverter.GetBytes(VERSION))]);
+            };
         }
 
         private void StartOutbound()
@@ -132,6 +141,13 @@ namespace NuclearVOIP
 
             switch (cmd)
             {
+                case Commands.HANDSHAKE:
+                    ushort version = BinaryPrimitives.ReadUInt16LittleEndian(data[1..3]);
+
+                    if (version > VERSION)
+                        networking.Disconnect(player);
+
+                    break;
                 case Commands.START:
                     if (streams.ContainsKey(player))
                     {
