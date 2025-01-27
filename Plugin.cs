@@ -42,8 +42,10 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<KeyboardShortcut> configAllTalkKey;
 
         internal readonly ConfigEntry<int> configVOIPPort;
+        internal readonly ConfigEntry<float> configInputGain;
+        internal readonly ConfigEntry<float> configOutputGain;
 
-        internal readonly bool NET_DEBUG = true;
+        internal readonly bool NET_DEBUG = false;
 
         Plugin()
         {
@@ -69,6 +71,20 @@ namespace NuclearVOIP
                     "VOIP Port",
                     5000,
                     "The port to discover and transmit voice chat on"
+                );
+
+            configInputGain = Config.Bind(
+                    "General",
+                    "Microphone Gain",
+                    1.0f,
+                    "A (linear) multiplier applied to microphone readings"
+                );
+
+            configOutputGain = Config.Bind(
+                    "General",
+                    "Output Gain",
+                    1.0f,
+                    "A (in dB) multiplier applied to incoming voice"
                 );
 
             LoadingManager.GameLoaded += LateLoad;
