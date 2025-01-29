@@ -1,12 +1,15 @@
 using BepInEx;
 using BepInEx.Configuration;
-using BepInEx.Unity.Mono;
-using BepInEx.Unity.Mono.Configuration;
 using System;
 using System.Threading;
 using BepInEx.Logging;
 using Steamworks;
 using UnityEngine;
+
+#if BEP6
+using BepInEx.Unity.Mono;
+using BepInEx.Unity.Mono.Configuration;
+#endif
 
 namespace NuclearVOIP
 {
