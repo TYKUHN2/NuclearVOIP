@@ -46,15 +46,11 @@ namespace NuclearVOIP
 
                 target = value;
 
-                if (was == Target.STOPPED)
-                    StartOutbound();
-                else if (value == Target.STOPPED)
+                if (was != Target.STOPPED && was != value)
                     StopOutbound(was);
-                else
-                {
-                    StopOutbound(was);
+
+                if (value != Target.STOPPED && was != value)
                     StartOutbound();
-                }
             }
         }
 
@@ -71,6 +67,7 @@ namespace NuclearVOIP
             {
                 networking.SendTo(player, [(byte)Commands.HANDSHAKE, .. (BitConverter.GetBytes(VERSION))]);
             };
+            networking.OnNetworkMeasurement += comms.UpdateStatus;
         }
 
         private void StartOutbound()

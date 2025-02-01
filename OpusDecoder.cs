@@ -49,7 +49,8 @@ namespace NuclearVOIP
         {
             float[] decoded = new float[5760];
 
-            int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 0);
+            int fec = LibOpus.opus_packet_has_lbrr(packet, packet.Length);
+            int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, fec);
             if (err < 0)
             {
                 Marshal.FreeHGlobal(decoder);

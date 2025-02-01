@@ -1,4 +1,4 @@
-﻿using System;
+﻿    using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -22,6 +22,7 @@ namespace NuclearVOIP
         public event Action<CSteamID>? NewConnection;
         public event Action<CSteamID, byte[]>? OnPacket;
         public event Action<CSteamID>? ConnectionLost;
+        public event Action<NetworkStatus, NetworkStatus>? OnNetworkMeasurement;
 
         NetworkSystem()
         {
@@ -63,6 +64,15 @@ namespace NuclearVOIP
             if (elapsed >= INTERVAL)
             {
                 elapsed -= INTERVAL;
+
+                List<float> qualities = new(connections.Count);
+                List<int> pings = new(connections.Count);
+                List<int> bandwidths = new(connections.Count);
+
+                List<float> teamQualities = [];
+                List<int> teamPings = [];
+                List<int> teamBandwidths = [];
+
                 for (int i = 0; i < connections.Count; i++)
                 {
                     SteamNetworkingIdentity identity = connections[i];
@@ -93,8 +103,43 @@ namespace NuclearVOIP
                             continue;
                         }
 
-                        // Later I'll add something about packet loss and ping here.
+                        if (peer.HQ == GameManager.LocalFactionHQ)
+                        {
+                            teamQualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
+                            teamPings.Add(status.m_nPing);
+                            teamBandwidths.Add(status.m_nSendRateBytesPerSecond);
+                        }
+
+                        qualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
+                        pings.Add(status.m_nPing);
+                        bandwidths.Add(status.m_nSendRateBytesPerSecond);
                     }
+
+                    NetworkStatus teamStatus = new()
+                    {
+                        avgQuality = teamQualities.Average(),
+                        minQuality = teamQualities.Min(),
+
+                        avgPing = (int)teamPings.Average(),
+                        maxPing = teamPings.Max(),
+
+                        avgBandwidth = (int)teamBandwidths.Average(),
+                        minBandwidth = teamBandwidths.Min()
+                    };
+
+                    NetworkStatus allStatus = new()
+                    {
+                        avgQuality = qualities.Average(),
+                        minQuality = qualities.Min(),
+
+                        avgPing = (int)pings.Average(),
+                        maxPing = pings.Max(),
+
+                        avgBandwidth = (int)bandwidths.Average(),
+                        minBandwidth = bandwidths.Min()
+                    };
+
+                    OnNetworkMeasurement?.Invoke(allStatus, teamStatus);
                 }
             }
 

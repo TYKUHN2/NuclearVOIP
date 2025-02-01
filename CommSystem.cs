@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using static NuclearVOIP.LibOpus;
+
 
 #if BEP6
 using BepInEx.Unity.Mono.Configuration;
@@ -25,6 +27,30 @@ namespace NuclearVOIP
         public event Action<byte[][]>? OnData;
         public event Action<OpusMultiStreamer.Target>? OnTarget;
 
+        private NetworkStatus allStatus = new()
+        {
+            maxPing = 0,
+            avgPing = 0,
+
+            minBandwidth = 0,
+            avgBandwidth = 0,
+
+            minQuality = 1,
+            avgQuality = 1
+        };
+
+        private NetworkStatus teamStatus = new()
+        {
+            maxPing = 0,
+            avgPing = 0,
+
+            minBandwidth = 0,
+            avgBandwidth = 0,
+
+            minQuality = 1,
+            avgQuality = 1
+        };
+
         public void Awake()
         {
             listener = gameObject.AddComponent<MicrophoneListener>();
@@ -43,9 +69,13 @@ namespace NuclearVOIP
 
             if (!listener!.enabled && (talkKey.IsDown() || allTalkKey.IsDown()))
             {
+                activeKey = talkKey.IsDown() ? talkKey : allTalkKey;
+
                 Plugin.Instance.Config.Reload();
 
                 encoder = new(listener.frequency);
+                UpdateEncoder();
+
                 encoder.OnData += _OnData;
 
                 listener.OnData += (StreamArgs<float> args) =>
@@ -58,8 +88,6 @@ namespace NuclearVOIP
                 };
 
                 listener.enabled = true;
-
-                activeKey = talkKey.IsDown() ? talkKey : allTalkKey;
 
                 talkingList!.AddPlayer(GameManager.LocalPlayer);
 
@@ -133,6 +161,14 @@ namespace NuclearVOIP
                 talkingList!.RemovePlayer(playerObj);
         }
 
+        internal void UpdateStatus(NetworkStatus all, NetworkStatus team)
+        {
+            allStatus = all;
+            teamStatus = team;
+
+            UpdateEncoder();
+        }
+
         private void _OnData(StreamArgs<byte[]> args)
         {
             args.Handle();
@@ -147,6 +183,18 @@ namespace NuclearVOIP
 
                 OnData.Invoke(args.data);
             }
+        }
+
+        private void UpdateEncoder()
+        {
+            if (encoder == null || activeKey == null)
+                return;
+
+            NetworkStatus curStatus = activeKey.Equals(Plugin.Instance.configAllTalkKey.Value) ? allStatus : teamStatus;
+
+            encoder.BitRate = curStatus.minBandwidth == 0 ? -1000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
+            encoder.FEC = curStatus.avgQuality >= 0.75 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
+            encoder.PacketLoss = (int)(curStatus.avgQuality * 100);
         }
     }
 }

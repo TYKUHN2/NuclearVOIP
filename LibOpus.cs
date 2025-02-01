@@ -84,6 +84,9 @@ namespace NuclearVOIP
         public static extern int opus_decoder_ctl(IntPtr decoder, int req, out int val); // get variant
 
 
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_packet_has_lbrr(byte[] packet, int len);
+
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr opus_strerror(int err);
