@@ -72,7 +72,8 @@ namespace NuclearVOIP
 
         private static void ClientConnectCallback(INetworkPlayer player)
         {
-            player.OnIdentityChanged += OnIdentity;
+            if (GameManager.gameState == GameManager.GameState.Singleplayer || GameManager.gameState == GameManager.GameState.Multiplayer)
+                player.OnIdentityChanged += OnIdentity;
         }
 
         private static void ClientDisconectCallback(ClientStoppedReason reason)
