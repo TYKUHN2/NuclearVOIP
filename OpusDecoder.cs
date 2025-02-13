@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace NuclearVOIP
 {
@@ -17,6 +18,18 @@ namespace NuclearVOIP
             set
             {
                 SetCtl(LibOpus.DecoderCtl.SET_GAIN, value);
+            }
+        }
+
+        public int Complexity
+        {
+            get
+            {
+                return GetCtl(LibOpus.DecoderCtl.GET_COMPLEXITY);
+            }
+            set
+            {
+                SetCtl(LibOpus.DecoderCtl.SET_COMPLEXITY, value);
             }
         }
 
@@ -47,6 +60,32 @@ namespace NuclearVOIP
 
         private float[] DoDecode(byte[] packet)
         {
+            int framerate = Plugin.Instance.FrameRate;
+
+            if (QualitySettings.vSyncCount == 1)
+            {
+                int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
+
+                if (difference >= 3)
+                    --Complexity;
+                else if (difference <= 1)
+                {
+                    int curComplexity = Complexity; // Avoid repeatedly fetching
+                    if (curComplexity < 10)
+                        Complexity = curComplexity + 1;
+                }
+            }
+            else if (framerate < 50)
+                --Complexity;
+            else if (framerate < 20)
+                Complexity -= 2;
+            else if (framerate > 70)
+            {
+                int curComplexity = Complexity; // Avoid repeatedly fetching
+                if (curComplexity < 10)
+                    Complexity = curComplexity + 1;
+            }
+
             float[] decoded = new float[5760];
 
             int fec = LibOpus.opus_packet_has_lbrr(packet, packet.Length);

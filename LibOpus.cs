@@ -33,6 +33,8 @@ namespace NuclearVOIP
 
         public enum DecoderCtl
         {
+            SET_COMPLEXITY = 4010,
+            GET_COMPLEXITY = 4011,
             SET_GAIN = 4034,
             GET_GAIN = 4045
         }

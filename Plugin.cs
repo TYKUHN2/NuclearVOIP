@@ -50,6 +50,22 @@ namespace NuclearVOIP
 
         internal readonly bool NET_DEBUG = false;
 
+        private float[] deltas = new float[10];
+
+        public int FrameRate
+        {
+            get
+            {
+                double sum = 0;
+                foreach (var delta in deltas)
+                    sum += delta;
+
+                sum /= deltas.Length;
+
+                return (int)Math.Round(sum);
+            }
+        }
+
         Plugin()
         {
             if (Interlocked.CompareExchange(ref _Instance, this, null) != null) // I like being thread safe okay?
@@ -101,6 +117,14 @@ namespace NuclearVOIP
         private void Awake()
         {
             Logger.LogInfo($"Loaded {MyPluginInfo.PLUGIN_GUID}");
+        }
+
+        private void Update()
+        {
+            float[] copy = new float[10];
+            copy[9] = Time.deltaTime;
+            Array.Copy(deltas, 1, copy, 0, 9);
+            deltas = copy;
         }
 
         private void LateLoad()

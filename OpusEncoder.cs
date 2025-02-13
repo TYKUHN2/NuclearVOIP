@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using UnityEngine;
 
 namespace NuclearVOIP
 {
@@ -90,6 +91,18 @@ namespace NuclearVOIP
             }
         }
 
+        public int Complexity
+        {
+            get
+            {
+                return GetCtl(LibOpus.EncoderCtl.GET_COMPLEXITY);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_COMPLEXITY, value);
+            }
+        }
+
         unsafe public OpusEncoder(int frequency)
         {
             frameSize = (int)(0.02 * frequency);
@@ -137,6 +150,32 @@ namespace NuclearVOIP
             try
             {
                 args.Handle();
+
+                int framerate = Plugin.Instance.FrameRate;
+
+                if (QualitySettings.vSyncCount == 1)
+                {
+                    int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
+
+                    if (difference >= 3)
+                        --Complexity;
+                    else if (difference <= 1)
+                    {
+                        int curComplexity = Complexity; // Avoid repeatedly fetching
+                        if (curComplexity < 10)
+                            Complexity = curComplexity + 1;
+                    }
+                }
+                else if (framerate < 50)
+                    --Complexity;
+                else if (framerate < 20)
+                    Complexity -= 2;
+                else if (framerate > 70)
+                {
+                    int curComplexity = Complexity; // Avoid repeatedly fetching
+                    if (curComplexity < 10)
+                        Complexity = curComplexity + 1;
+                }
 
                 float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
