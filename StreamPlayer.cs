@@ -9,6 +9,9 @@ namespace NuclearVOIP
 
         public readonly OpusDecoder decoder = new();
 
+        public delegate void Modifier(ref float[] samples);
+        public Modifier? curModifier;
+
         void Awake()
         {
             source = gameObject.AddComponent<AudioSource>();
@@ -17,13 +20,15 @@ namespace NuclearVOIP
             clip.OnReady += () => { source.Play(); };
             clip.OnDry += () => { source.Pause(); };
 
-            decoder.Pipe(clip);
-        }
+            decoder.OnData += (StreamArgs<float> args) =>
+            {
+                args.Handle();
 
-        void OnDestroy()
-        {
-            Destroy(clip);
-            Destroy(source);
+                float[] samples = args.data;
+                curModifier?.Invoke(ref samples);
+
+                clip.Write(samples);
+            };
         }
     }
 }

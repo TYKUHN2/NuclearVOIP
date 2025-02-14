@@ -1,10 +1,10 @@
-using NuclearVOIP.UI;
+﻿using NuclearVOIP.UI;
 using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using static NuclearVOIP.LibOpus;
+using System.Reflection;
 
 
 #if BEP6
@@ -17,6 +17,11 @@ namespace NuclearVOIP
 {
     internal class CommSystem: MonoBehaviour
     {
+        private const float MAX_STRENGTH = 0.01f;
+
+        private static readonly FieldInfo accumulation = typeof(Radar).GetField("jamAccumulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo tolerance = typeof(Radar).GetField("jamTolerance", BindingFlags.Instance | BindingFlags.NonPublic);
+
         private MicrophoneListener? listener;
         private OpusEncoder? encoder;
         private KeyboardShortcut? activeKey;
@@ -140,10 +145,8 @@ namespace NuclearVOIP
             if (playerObj != GameManager.LocalPlayer) // DebugNetworkingSystem will error otherwise
                 talkingList!.AddPlayer(playerObj);
 
-            return (byte[][] opusPackets) =>
-            {
-                sPlayer.decoder.Write(opusPackets);
-            };
+            sPlayer.curModifier = JamModifier;
+            return sPlayer.decoder.Write;
         }
 
         internal void DestroyStream(CSteamID player)
@@ -200,6 +203,40 @@ namespace NuclearVOIP
             encoder.BitRate = curStatus.minBandwidth == 0 ? -1000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
             encoder.FEC = curStatus.avgQuality <= 0.75 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
             encoder.PacketLoss = 100 - (int)(curStatus.avgQuality * 100);
+        }
+
+        private void JamModifier(ref float[] samples)
+        {
+            Radar? radar = (Radar?)GameManager.LocalAircraft?.radar;
+
+            if (radar == null) return;
+
+            if (radar.IsJammed())
+            {
+                float jamAccumulation = (float)accumulation.GetValue(radar);
+                float jamTolerance = (float)tolerance.GetValue(radar);
+
+                float strength = Math.Min(jamAccumulation / jamTolerance, 1.0f) * MAX_STRENGTH;
+
+                float[] offsets = new float[samples.Length / 10];
+                for (int i = 0; i < offsets.Length; i++)
+                    offsets[i] = Math.Abs((Util.Random() - 0.5f) * strength);
+
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    int index = i * 10;
+                    for (int j = 0; j < 10; j++)
+                    {
+                        float sample = samples[index + j];
+                        float neg = -sample;
+
+                        if (MathF.Sign(sample) == -1)
+                           (neg, sample) = (sample, neg);
+
+                        samples[index + j] = Math.Clamp(sample - offsets[i], neg, sample);
+                    }
+                }
+            }
         }
     }
 }
