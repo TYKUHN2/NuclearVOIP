@@ -1,12 +1,14 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
-using UnityEngine;
+//using UnityEngine;
 
 namespace NuclearVOIP
 {
     internal class OpusEncoder: AbstractTransform<float, byte[]>
     {
+        //private int frame = 0;
+
         private const bool DECODER_TEST = false;
         private readonly IntPtr encoder;
         private readonly IntPtr decoder;
@@ -151,31 +153,29 @@ namespace NuclearVOIP
             {
                 args.Handle();
 
-                int framerate = Plugin.Instance.FrameRate;
-
-                if (QualitySettings.vSyncCount == 1)
-                {
-                    int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
-
-                    if (difference >= 3)
-                        --Complexity;
-                    else if (difference <= 1)
-                    {
-                        int curComplexity = Complexity; // Avoid repeatedly fetching
-                        if (curComplexity < 10)
-                            Complexity = curComplexity + 1;
-                    }
-                }
-                else if (framerate < 50)
-                    --Complexity;
-                else if (framerate < 20)
-                    Complexity -= 2;
-                else if (framerate > 70)
+                /*if (frame > (Time.frameCount + 5)) // Only update every 6 frames, supports roll over.
                 {
                     int curComplexity = Complexity; // Avoid repeatedly fetching
-                    if (curComplexity < 10)
+                    int framerate = Plugin.Instance.FrameRate;
+
+                    if (QualitySettings.vSyncCount == 1)
+                    {
+                        int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
+
+                        if (difference >= 3 && curComplexity > 0)
+                            Complexity = curComplexity - 1;
+                        else if (difference <= 1 && curComplexity < 10)
+                            Complexity = curComplexity + 1;
+                    }
+                    else if (framerate < 20 && curComplexity > 1)
+                        Complexity = curComplexity - 2;
+                    else if (framerate < 50 && curComplexity > 0)
+                        Complexity = curComplexity - 1;
+                    else if (framerate > 70 && curComplexity < 10)
                         Complexity = curComplexity + 1;
-                }
+
+                    frame = Time.frameCount;
+                }*/
 
                 float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
