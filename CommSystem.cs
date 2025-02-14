@@ -1,4 +1,4 @@
-﻿using NuclearVOIP.UI;
+using NuclearVOIP.UI;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -55,6 +55,18 @@ namespace NuclearVOIP
         {
             listener = gameObject.AddComponent<MicrophoneListener>();
 
+            listener.OnData += (StreamArgs<float> args) =>
+            {
+                if (encoder == null)
+                    return;
+
+                args.Handle();
+
+                float[] boosted = args.data.Select(a => a * Plugin.Instance.configInputGain.Value).ToArray();
+
+                encoder.Write(boosted);
+            };
+
             GameObject go = new("TalkingList");
             talkingList = go.AddComponent<TalkingList>();
 
@@ -78,15 +90,6 @@ namespace NuclearVOIP
 
                 encoder.OnData += _OnData;
 
-                listener.OnData += (StreamArgs<float> args) =>
-                {
-                    args.Handle();
-
-                    float[] boosted = args.data.Select(a => a * Plugin.Instance.configInputGain.Value).ToArray();
-
-                    encoder.Write(boosted);
-                };
-
                 listener.enabled = true;
 
                 talkingList!.AddPlayer(GameManager.LocalPlayer);
@@ -100,7 +103,6 @@ namespace NuclearVOIP
 
                 talkingList!.RemovePlayer(GameManager.LocalPlayer);
 
-                listener.Pipe(null);
                 OnTarget?.Invoke(OpusMultiStreamer.Target.STOPPED);
             }
         }
@@ -122,7 +124,10 @@ namespace NuclearVOIP
                 DestroyStream(player);
             }
 
-            StreamPlayer sPlayer = gameObject.AddComponent<StreamPlayer>();
+            GameObject newObj = new($"OpusStream: {player}");
+            newObj.transform.parent = gameObject.transform;
+
+            StreamPlayer sPlayer = newObj.AddComponent<StreamPlayer>();
             sPlayer.decoder.Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256);
 
             players[player] = sPlayer;
@@ -150,7 +155,7 @@ namespace NuclearVOIP
             }
 
             players.Remove(player);
-            Destroy(sPlayer);
+            Destroy(sPlayer.gameObject);
 
             Player playerObj = UnitRegistry.playerLookup
                 .Where(a => a.Value.SteamID == player.m_SteamID)
