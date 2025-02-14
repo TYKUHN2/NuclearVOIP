@@ -156,13 +156,13 @@ namespace NuclearVOIP
                     {
                         SteamNetworkingMessage_t* message = (SteamNetworkingMessage_t*)pointers[i];
 
-                        if (message->m_cbSize == 0) // Just a stupid handshake
-                            continue;
+                        if (message->m_cbSize != 0) // Just a stupid handshake
+                        {
+                            byte[] packet = new byte[message->m_cbSize];
+                            Marshal.Copy(message->m_pData, packet, 0, packet.Length);
 
-                        byte[] packet = new byte[message->m_cbSize];
-                        Marshal.Copy(message->m_pData, packet, 0, packet.Length);
-
-                        packets.Add((message->m_identityPeer, packet));
+                            packets.Add((message->m_identityPeer, packet));
+                        }
 
                         SteamNetworkingMessage_t.Release((IntPtr)message);
                     }

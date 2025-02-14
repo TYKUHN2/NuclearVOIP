@@ -48,7 +48,11 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<float> configInputGain;
         internal readonly ConfigEntry<float> configOutputGain;
 
+#if DEBUG
+        internal readonly bool NET_DEBUG = true;
+#else
         internal readonly bool NET_DEBUG = false;
+#endif
 
         private float[] deltas = new float[10];
 

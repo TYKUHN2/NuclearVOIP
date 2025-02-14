@@ -198,8 +198,8 @@ namespace NuclearVOIP
             NetworkStatus curStatus = activeKey.Equals(Plugin.Instance.configAllTalkKey.Value) ? allStatus : teamStatus;
 
             encoder.BitRate = curStatus.minBandwidth == 0 ? -1000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
-            encoder.FEC = curStatus.avgQuality >= 0.75 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
-            encoder.PacketLoss = (int)(curStatus.avgQuality * 100);
+            encoder.FEC = curStatus.avgQuality <= 0.75 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
+            encoder.PacketLoss = 100 - (int)(curStatus.avgQuality * 100);
         }
     }
 }
