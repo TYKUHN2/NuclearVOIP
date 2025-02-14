@@ -234,7 +234,10 @@ namespace NuclearVOIP
                 .FirstOrDefault();
 
             if (player != null && !ChatManager.IsMuted(player)) // TODO: When a player is unmuted (might need a patch) retry connection
+            {
                 SteamNetworking.AcceptP2PSessionWithUser(request.m_identityRemote.GetSteamID());
+                NewConnection?.Invoke(request.m_identityRemote.GetSteamID());
+            }
             else
                 Plugin.Logger.LogWarning("Received P2P request from random user");
         }
