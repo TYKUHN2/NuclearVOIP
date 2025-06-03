@@ -31,6 +31,8 @@ namespace NuclearVOIP
         private readonly Dictionary<CSteamID, OpusNetworkStream> streams = [];
         private ushort pos = 0;
 
+        internal byte channel = 0;
+
         private Target target;
         public Target CurTarget { 
             get
@@ -75,7 +77,7 @@ namespace NuclearVOIP
             switch (target)
             {
                 case Target.TEAM:
-                    networking.SendToTeam([(byte)Commands.START]);
+                    networking.SendToTeam([(byte)Commands.START, channel]);
                     break;
                 case Target.GLOBAL:
                     networking.SendToAll([(byte)Commands.START]);
@@ -152,12 +154,15 @@ namespace NuclearVOIP
                         EndStream(player);
                     }
 
-                    streams[player] = new(comms.NewStream(player));
+                    if (data.Length == 1 || data[1] == channel) // Global, old, or our channel
+                        streams[player] = new(comms.NewStream(player));
+                    // else prevent inbound data, needs more complex logic
+
                     break;
                 case Commands.DATA:
                     if (!streams.TryGetValue(player, out OpusNetworkStream stream))
                     {
-                        Plugin.Logger.LogError("Peer tried to send data on stopped stream");
+                        //Plugin.Logger.LogError("Peer tried to send data on stopped stream");
                         return;
                     }
 

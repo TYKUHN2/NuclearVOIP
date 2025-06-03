@@ -39,10 +39,11 @@ namespace NuclearVOIP
             get { return base.Logger; }
         }
 
-        private OpusMultiStreamer? streamer;
+        internal OpusMultiStreamer? streamer;
 
         internal readonly ConfigEntry<KeyboardShortcut> configTalkKey;
         internal readonly ConfigEntry<KeyboardShortcut> configAllTalkKey;
+        internal readonly ConfigEntry<KeyboardShortcut> configChannelKey;
 
         internal readonly ConfigEntry<int> configVOIPPort;
         internal readonly ConfigEntry<float> configInputGain;
@@ -87,6 +88,13 @@ namespace NuclearVOIP
                     "All Talk Key",
                     new KeyboardShortcut(KeyCode.C),
                     "Push to talk to all key"
+                );
+
+            configChannelKey = Config.Bind(
+                    "General",
+                    "Change Channel",
+                    new KeyboardShortcut(KeyCode.Slash),
+                    "Change talk channel"
                 );
 
             configVOIPPort = Config.Bind(

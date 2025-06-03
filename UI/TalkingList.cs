@@ -36,10 +36,6 @@ namespace NuclearVOIP.UI
             rtrans.anchorMax = new Vector2(1, 0);
             rtrans.anchorMin = new Vector2(0, 0);
             rtrans.pivot = new Vector2(0, 1);
-
-            CanvasGroup group = gameObject.AddComponent<CanvasGroup>();
-            group.interactable = false;
-            group.blocksRaycasts = false;
         }
     }
 }

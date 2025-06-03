@@ -72,11 +72,16 @@ namespace NuclearVOIP
                 encoder.Write(boosted);
             };
 
+            GameObject UI = new("VOIPUI");
+            UI.AddComponent<UIGroup>();
+
             GameObject go = new("TalkingList");
+            go.transform.SetParent(UI.transform, false);
+
             talkingList = go.AddComponent<TalkingList>();
 
             GameObject host = GameObject.Find("/SceneEssentials/Canvas/ChatCanvas/TopPanel/LeftSpace");
-            go.transform.SetParent(host.transform, false);
+            UI.transform.SetParent(host.transform, false);
         }
 
         private void Update()
