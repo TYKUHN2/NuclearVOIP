@@ -115,6 +115,20 @@ namespace NuclearVOIP
                         bandwidths.Add(status.m_nSendRateBytesPerSecond);
                     }
 
+                    if (teamQualities.Count == 0)
+                    {
+                        teamQualities.Add(1);
+                        teamPings.Add(0);
+                        teamBandwidths.Add(0);
+                    }
+
+                    if (qualities.Count == 0)
+                    {
+                        qualities.Add(1);
+                        pings.Add(0);
+                        bandwidths.Add(0);
+                    }
+
                     NetworkStatus teamStatus = new()
                     {
                         avgQuality = teamQualities.Average(),
