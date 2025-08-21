@@ -1,5 +1,4 @@
-﻿using Steamworks;
-using System;
+﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -27,8 +26,8 @@ namespace NuclearVOIP
         }
 
         private readonly CommSystem comms;
-        private readonly INetworkSystem networking;
-        private readonly Dictionary<CSteamID, OpusNetworkStream> streams = [];
+        private readonly NetworkSystem networking;
+        private readonly Dictionary<ulong, OpusNetworkStream> streams = [];
         private ushort pos = 0;
 
         internal byte channel = 0;
@@ -56,16 +55,16 @@ namespace NuclearVOIP
             }
         }
 
-        public OpusMultiStreamer(CommSystem comms, INetworkSystem networking)
+        public OpusMultiStreamer(CommSystem comms, NetworkSystem networking)
         {
             this.comms = comms;
             this.networking = networking;
 
             comms.OnData += OnData;
-            comms.OnTarget += (Target target) => { CurTarget = target; };
+            comms.OnTarget += target => { CurTarget = target; };
             networking.OnPacket += Parse;
             networking.ConnectionLost += EndStream;
-            networking.NewConnection += (CSteamID player) =>
+            networking.NewConnection += player =>
             {
                 networking.SendTo(player, [(byte)Commands.HANDSHAKE, .. (BitConverter.GetBytes(VERSION))]);
             };
@@ -134,7 +133,7 @@ namespace NuclearVOIP
                 networking.SendToAll(encoded);
         }
 
-        private void Parse(CSteamID player, byte[] data)
+        private void Parse(ulong player, byte[] data)
         {
             Commands cmd = (Commands)data[0];
 
@@ -180,7 +179,7 @@ namespace NuclearVOIP
             }
         }
 
-        private void EndStream(CSteamID player)
+        private void EndStream(ulong player)
         {
             if (!streams.TryGetValue(player, out OpusNetworkStream stream))
             {

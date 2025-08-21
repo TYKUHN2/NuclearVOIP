@@ -5,6 +5,7 @@ using System.Threading;
 using BepInEx.Logging;
 using Steamworks;
 using UnityEngine;
+using AtomicFramework;
 
 #if BEP6
 using BepInEx.Unity.Mono;
@@ -14,9 +15,14 @@ using BepInEx.Unity.Mono.Configuration;
 namespace NuclearVOIP
 {
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
-    [BepInProcess("NuclearOption.exe")]
-    public class Plugin : BaseUnityPlugin
+    public class Plugin: Mod
     {
+        private static readonly Options options = new()
+        {
+            multiplayerOptions = Options.Multiplayer.CLIENT_ONLY,
+            repository = "TYKUHN2/NuclearVOIP"
+        };
+
         private static Plugin? _Instance;
         internal static Plugin Instance
         {
@@ -29,15 +35,11 @@ namespace NuclearVOIP
             }
         }
 
-        internal new static ManualLogSource Logger
-        {
-            get { return Instance._Logger; }
-        }
+        internal new NetworkAPI? Networking => base.Networking;
 
-        private ManualLogSource _Logger
-        {
-            get { return base.Logger; }
-        }
+        internal new static ManualLogSource Logger => Instance._Logger;
+
+        private ManualLogSource _Logger => base.Logger;
 
         internal OpusMultiStreamer? streamer;
 
@@ -48,12 +50,6 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<int> configVOIPPort;
         internal readonly ConfigEntry<float> configInputGain;
         internal readonly ConfigEntry<float> configOutputGain;
-
-#if DEBUG
-        internal readonly bool NET_DEBUG = true;
-#else
-        internal readonly bool NET_DEBUG = false;
-#endif
 
         private float[] deltas = new float[10];
 
@@ -71,7 +67,7 @@ namespace NuclearVOIP
             }
         }
 
-        Plugin()
+        Plugin(): base(options)
         {
             if (Interlocked.CompareExchange(ref _Instance, this, null) != null) // I like being thread safe okay?
                 throw new InvalidOperationException($"Reinitialization of Plugin {MyPluginInfo.PLUGIN_GUID}");
@@ -174,20 +170,11 @@ namespace NuclearVOIP
 
         private void LoadingFinished()
         {
-            if (NET_DEBUG || GameManager.gameState != GameManager.GameState.Singleplayer)
-            {
-                GameObject host = GameManager.LocalPlayer.gameObject;
-                INetworkSystem networkSystem;
+            GameObject host = GameManager.LocalPlayer.gameObject;
+            NetworkSystem networkSystem = host.AddComponent<NetworkSystem>();
+            CommSystem comms = host.AddComponent<CommSystem>();
 
-                if (NET_DEBUG && GameManager.gameState == GameManager.GameState.Singleplayer)
-                    networkSystem = host.AddComponent<DebugNetworkSystem>();
-                else
-                    networkSystem = host.AddComponent<NetworkSystem>();
-
-                CommSystem comms = host.AddComponent<CommSystem>();
-
-                streamer = new(comms, networkSystem);
-            }
+            streamer = new(comms, networkSystem);
         }
     }
 }

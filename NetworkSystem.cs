@@ -1,60 +1,72 @@
-﻿using System;
+﻿using AtomicFramework;
+using NuclearOption.Networking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using NuclearOption.Networking;
-using Steamworks;
 using UnityEngine;
 
 namespace NuclearVOIP
 {
-    internal class NetworkSystem: MonoBehaviour, INetworkSystem
+    internal class NetworkSystem: MonoBehaviour
     {
         private const float INTERVAL = 0.02f;
 
-        private readonly int channel = Plugin.Instance.configVOIPPort.Value;
-        private readonly List<SteamNetworkingIdentity> connections = [];
+        private readonly List<ulong> connections = [];
         private float elapsed = 0;
 
-        private readonly Callback<SteamNetworkingMessagesSessionRequest_t> sessionReq;
-        private readonly Callback<SteamNetworkingMessagesSessionFailed_t> messageFailed;
-
-        public event Action<CSteamID>? NewConnection;
-        public event Action<CSteamID, byte[]>? OnPacket;
-        public event Action<CSteamID>? ConnectionLost;
+        public event Action<ulong>? NewConnection;
+        public event Action<ulong, byte[]>? OnPacket;
+        public event Action<ulong>? ConnectionLost;
         public event Action<NetworkStatus, NetworkStatus>? OnNetworkMeasurement;
 
-        NetworkSystem()
-        {
-            sessionReq = Callback<SteamNetworkingMessagesSessionRequest_t>.Create(OnSession);
-            messageFailed = Callback<SteamNetworkingMessagesSessionFailed_t>.Create(OnDisconnect);
-
-            Player[] players = [..UnitRegistry.playerLookup.Values];
-            foreach (Player player in players)
-            {
-                if (player == GameManager.LocalPlayer)
-                    continue;
-
-                SteamNetworkingIdentity target = new()
-                {
-                    m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID
-                };
-                target.SetSteamID64(player.SteamID);
-
-                SteamNetworkingMessages.SendMessageToUser(ref target, IntPtr.Zero, 0, 9, channel);
-                connections.Add(target);
-
-                player.Identity.OnStopClient.AddListener(() => { OnDisconnect(target); });
-            }
-        }
+        private NetworkChannel chan;
 
         ~NetworkSystem()
         {
-            foreach (SteamNetworkingIdentity identity in connections)
+            Plugin.Instance.Networking?.CloseChannel(0);
+        }
+
+        private void Awake()
+        {
+            if (Plugin.Instance.Networking == null)
             {
-                SteamNetworkingIdentity copy = identity;
-                SteamNetworkingMessages.CloseSessionWithUser(ref copy);
+                Destroy(this);
+                return;
             }
+
+            chan = Plugin.Instance.Networking.OpenChannel(0);
+
+            chan.OnConnection += OnSession;
+            chan.OnDisconnect += OnDisconnect;
+
+            Discovery discovery = NetworkingManager.instance!.discovery;
+
+            discovery.Ready += () =>
+            {
+                List<ulong> awaiting = [.. discovery.Players];
+
+                void OnMods(ulong player)
+                {
+                    if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
+                    {
+                        chan.Connect(player);
+                        awaiting.Remove(player);
+                    }
+                }
+
+                foreach (ulong player in discovery.Players)
+                {
+                    if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
+                    {
+                        chan.Connect(player);
+                        awaiting.Remove(player);
+                    }
+                }
+
+                discovery.ModsAvailable += OnMods;
+            };
+
+            chan.OnMessage += OnMessage;
         }
 
         private void FixedUpdate()
@@ -75,44 +87,28 @@ namespace NuclearVOIP
 
                 for (int i = 0; i < connections.Count; i++)
                 {
-                    SteamNetworkingIdentity identity = connections[i];
-                    Player peer = UnitRegistry.playerLookup
-                        .Where(a => a.Value.SteamID == identity.GetSteamID64())
-                        .First()
-                        .Value;
+                    ulong identity = connections[i];
+                    Player peer = NetworkingManager.instance!.GetPlayer(identity)!;
 
                     if (ChatManager.IsMuted(peer))
                     {
-                        SteamNetworkingMessages.CloseChannelWithUser(ref identity, channel);
-
-                        ConnectionLost?.Invoke(identity.GetSteamID());
+                        chan.Disconnect(identity);
+                        ConnectionLost?.Invoke(identity);
                     } 
                     else
                     {
-                        ESteamNetworkingConnectionState state = SteamNetworkingMessages.GetSessionConnectionInfo(
-                        ref identity,
-                        out SteamNetConnectionInfo_t info,
-                        out SteamNetConnectionRealTimeStatus_t status
-                        );
-
-                        if (state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ||
-                            state == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)
-                        {
-                            OnDisconnect(identity);
-
-                            continue;
-                        }
+                        NetworkStatistics state = chan.GetStatistics(identity);
 
                         if (peer.HQ == GameManager.LocalFactionHQ)
                         {
-                            teamQualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
-                            teamPings.Add(status.m_nPing);
-                            teamBandwidths.Add(status.m_nSendRateBytesPerSecond);
+                            teamQualities.Add(1 - state.packetLoss);
+                            teamPings.Add(state.ping);
+                            teamBandwidths.Add(state.bandwidth);
                         }
 
-                        qualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
-                        pings.Add(status.m_nPing);
-                        bandwidths.Add(status.m_nSendRateBytesPerSecond);
+                        qualities.Add(1 - state.packetLoss);
+                        pings.Add(state.ping);
+                        bandwidths.Add(state.bandwidth);
                     }
 
                     if (teamQualities.Count == 0)
@@ -156,52 +152,12 @@ namespace NuclearVOIP
                     OnNetworkMeasurement?.Invoke(allStatus, teamStatus);
                 }
             }
-
-            int cPlayers = UnitRegistry.playerLookup.Count;
-            IntPtr[] pointers = new IntPtr[cPlayers];
-
-            while (true)
-            {
-                List<(SteamNetworkingIdentity, byte[])> packets = [];
-                int received = SteamNetworkingMessages.ReceiveMessagesOnChannel(channel, pointers, cPlayers);
-                for (int i = 0; i < received; i++)
-                {
-                    unsafe
-                    {
-                        SteamNetworkingMessage_t* message = (SteamNetworkingMessage_t*)pointers[i];
-
-                        if (message->m_cbSize != 0) // Just a stupid handshake
-                        {
-                            byte[] packet = new byte[message->m_cbSize];
-                            Marshal.Copy(message->m_pData, packet, 0, packet.Length);
-
-                            packets.Add((message->m_identityPeer, packet));
-                        }
-
-                        SteamNetworkingMessage_t.Release((IntPtr)message);
-                    }
-                }
-
-                if (OnPacket == null)
-                    return;
-
-                foreach ((SteamNetworkingIdentity from, byte[] packet) in packets)
-                    OnPacket.Invoke(from.GetSteamID(), packet);
-
-                if (received < cPlayers)
-                    break;
-            }
         }
 
-        public void Disconnect(CSteamID player)
+        public void Disconnect(ulong player)
         {
-            SteamNetworkingIdentity conn = connections.Find(a => a.GetSteamID() == player);
-
-            if (!conn.Equals(default))
-            {
-                connections.Remove(conn);
-                SteamNetworkingMessages.CloseChannelWithUser(ref conn, channel);
-            }
+            connections.Remove(player);
+            OnDisconnect(player);
         }
 
         public void SendToTeam(byte[] data)
@@ -209,64 +165,49 @@ namespace NuclearVOIP
             FactionHQ ourHQ = GameManager.LocalFactionHQ;
             Player[] team = [..ourHQ.GetPlayers(false)];
 
-            foreach (SteamNetworkingIdentity identity in connections)
-                if (team.Any(a => a.SteamID == identity.GetSteamID64()))
-                    SendTo(identity, data);
+            foreach (ulong identity in connections)
+                if (team.Any(a => a.SteamID == identity))
+                    chan.Send(identity, data, true);
         }
 
         public void SendToAll(byte[] data)
         {
-            foreach (SteamNetworkingIdentity identity in connections)
-                SendTo(identity, data);
+            foreach (ulong identity in connections)
+                chan.Send(identity, data, true);
         }
 
-        public void SendTo(CSteamID target, byte[] data)
+        public void SendTo(ulong target, byte[] data)
         {
-            SteamNetworkingIdentity ident = new()
-            {
-                m_eType = ESteamNetworkingIdentityType.k_ESteamNetworkingIdentityType_SteamID
-            };
-            ident.SetSteamID(target);
-
-            SendTo(ident, data);
+            chan.Send(target, data, true);
         }
 
-        private unsafe void SendTo(SteamNetworkingIdentity target, byte[] data)
+        private bool OnSession(ulong player)
         {
-            fixed (byte* buf = data)
-            {
-                EResult result = SteamNetworkingMessages.SendMessageToUser(ref target, (IntPtr)buf, (uint)data.Length, 5, channel);
-                if (result == EResult.k_EResultNoConnection)
-                    SteamNetworkingMessages.CloseSessionWithUser(ref target);
-            }
-        }
-
-        private void OnSession(SteamNetworkingMessagesSessionRequest_t request)
-        {
-            Player? player = NetworkManagerNuclearOption.i.GamePlayers
-                .Where(a => a.SteamID == request.m_identityRemote.GetSteamID64())
+            Player? playerObj = NetworkManagerNuclearOption.i.GamePlayers
+                .Where(a => a.SteamID == player)
                 .FirstOrDefault();
 
-            if (player != null && !ChatManager.IsMuted(player)) // TODO: When a player is unmuted (might need a patch) retry connection
+            if (playerObj != null && !ChatManager.IsMuted(playerObj)) // TODO: When a player is unmuted (might need a patch) retry connection
             {
-                SteamNetworking.AcceptP2PSessionWithUser(request.m_identityRemote.GetSteamID());
-                NewConnection?.Invoke(request.m_identityRemote.GetSteamID());
+                NewConnection?.Invoke(player);
+                return true;
             }
             else
+            {
                 Plugin.Logger.LogWarning("Received P2P request from random user");
+                return false;
+            }
         }
 
-        private void OnDisconnect(SteamNetworkingIdentity target)
+        private void OnDisconnect(ulong player)
         {
-            SteamNetworkingMessages.CloseSessionWithUser(ref target);
-
-            if (connections.Remove(target))
-                ConnectionLost?.Invoke(target.GetSteamID());
+            if (connections.Remove(player))
+                ConnectionLost?.Invoke(player);
         }
 
-        private void OnDisconnect(SteamNetworkingMessagesSessionFailed_t failure)
+        private void OnMessage(NetworkMessage message)
         {
-            OnDisconnect(failure.m_info.m_identityRemote);
+            OnPacket?.Invoke(message.player, message.data);
         }
     }
 }

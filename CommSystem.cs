@@ -1,5 +1,4 @@
 ﻿using NuclearVOIP.UI;
-using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +26,7 @@ namespace NuclearVOIP
         private KeyboardShortcut? activeKey;
         private TalkingList? talkingList;
 
-        private readonly Dictionary<CSteamID, StreamPlayer> players = [];
+        private readonly Dictionary<ulong, StreamPlayer> players = [];
 
         public event Action<byte[][]>? OnData;
         public event Action<OpusMultiStreamer.Target>? OnTarget;
@@ -60,14 +59,14 @@ namespace NuclearVOIP
         {
             listener = gameObject.AddComponent<MicrophoneListener>();
 
-            listener.OnData += (StreamArgs<float> args) =>
+            listener.OnData += args =>
             {
                 if (encoder == null)
                     return;
 
                 args.Handle();
 
-                float[] boosted = args.data.Select(a => a * Plugin.Instance.configInputGain.Value).ToArray();
+                float[] boosted = [.. args.data.Select(a => a * Plugin.Instance.configInputGain.Value)];
 
                 encoder.Write(boosted);
             };
@@ -124,7 +123,7 @@ namespace NuclearVOIP
             encoder = null;
         }
 
-        internal Action<byte[][]> NewStream(CSteamID player)
+        internal Action<byte[][]> NewStream(ulong player)
         {
             Plugin.Instance.Config.Reload();
 
@@ -143,7 +142,7 @@ namespace NuclearVOIP
             players[player] = sPlayer;
 
             Player playerObj = UnitRegistry.playerLookup
-                .Where(a => a.Value.SteamID == player.m_SteamID)
+                .Where(a => a.Value.SteamID == player)
                 .First()
                 .Value;
 
@@ -154,7 +153,7 @@ namespace NuclearVOIP
             return sPlayer.decoder.Write;
         }
 
-        internal void DestroyStream(CSteamID player)
+        internal void DestroyStream(ulong player)
         {
             if (!players.TryGetValue(player, out StreamPlayer sPlayer))
             {
@@ -166,7 +165,7 @@ namespace NuclearVOIP
             Destroy(sPlayer.gameObject);
 
             Player playerObj = UnitRegistry.playerLookup
-                .Where(a => a.Value.SteamID == player.m_SteamID)
+                .Where(a => a.Value.SteamID == player)
                 .First()
                 .Value;
 

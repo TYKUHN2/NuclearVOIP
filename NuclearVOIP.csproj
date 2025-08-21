@@ -21,7 +21,7 @@
     <Platforms>AnyCPU;x64</Platforms>
     <Configurations>Debug-Bep6;Release-Bep6;Debug-Bep5;Release-Bep5</Configurations>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-    <NoWarn>8618;0162;8500;BepInEx002</NoWarn>
+    <NoWarn>8618;0162;8500;BepInEx002;IDE1006</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug-Bep6' Or '$(Configuration)'=='Release-Bep6'">
@@ -62,6 +62,10 @@
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="AtomicFramework">
+      <HintPath>..\AtomicFramework\AtomicFramework\bin\x64\Release-Bep6\netstandard2.1\AtomicFramework.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="com.rlabrecque.steamworks.net">
