@@ -21,7 +21,7 @@
     <Platforms>AnyCPU;x64</Platforms>
     <Configurations>Debug-Bep6;Release-Bep6;Debug-Bep5;Release-Bep5</Configurations>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-    <NoWarn>1701;1702;8500;BepInEx002</NoWarn>
+    <NoWarn>8618;0162;8500;BepInEx002</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug-Bep6' Or '$(Configuration)'=='Release-Bep6'">
@@ -58,24 +58,39 @@
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="com.rlabrecque.steamworks.net">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Mirage">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Mirage.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Mirage.SocketLayer">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Mirage.SocketLayer.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Mirage.SteamworksSocket">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Mirage.SteamworksSocket.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Rewired_Core.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Mathematics">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Unity.Mathematics.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Compile Remove="crc/**/*.cs" />
     <Compile Remove="Ogg*.cs" />
