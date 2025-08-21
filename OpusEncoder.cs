@@ -29,7 +29,7 @@ namespace NuclearVOIP
             }
             set
             {
-                SetCtl(LibOpus.EncoderCtl.SET_BITRATE, value);
+                SetCtl(LibOpus.EncoderCtl.SET_BITRATE, value == -1000 ? value : Math.Clamp(value, 500, 512000));
             }
         }
 
@@ -41,7 +41,7 @@ namespace NuclearVOIP
             }
             set
             {
-                SetCtl(LibOpus.EncoderCtl.SET_PACKET_LOSS_PERC, value);
+                SetCtl(LibOpus.EncoderCtl.SET_PACKET_LOSS_PERC, Math.Clamp(value, 0, 100));
             }
         }
 
@@ -89,7 +89,7 @@ namespace NuclearVOIP
             }
             set
             {
-                SetCtl(LibOpus.EncoderCtl.SET_LSB_DEPTH, value);
+                SetCtl(LibOpus.EncoderCtl.SET_LSB_DEPTH, Math.Clamp(value, 8, 24));
             }
         }
 
@@ -101,7 +101,7 @@ namespace NuclearVOIP
             }
             set
             {
-                SetCtl(LibOpus.EncoderCtl.SET_COMPLEXITY, value);
+                SetCtl(LibOpus.EncoderCtl.SET_COMPLEXITY, Math.Clamp(value, 0, 10));
             }
         }
 
