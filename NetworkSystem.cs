@@ -77,11 +77,11 @@ namespace NuclearVOIP
             {
                 elapsed -= INTERVAL;
 
-                List<float> qualities = new(connections.Count);
+                List<float> losses = new(connections.Count);
                 List<int> pings = new(connections.Count);
                 List<int> bandwidths = new(connections.Count);
 
-                List<float> teamQualities = [];
+                List<float> teamLosses = [];
                 List<int> teamPings = [];
                 List<int> teamBandwidths = [];
 
@@ -101,34 +101,34 @@ namespace NuclearVOIP
 
                         if (peer.HQ == GameManager.LocalFactionHQ)
                         {
-                            teamQualities.Add(1 - state.packetLoss);
+                            teamLosses.Add(state.packetLoss);
                             teamPings.Add(state.ping);
                             teamBandwidths.Add(state.bandwidth);
                         }
 
-                        qualities.Add(1 - state.packetLoss);
+                        losses.Add(state.packetLoss);
                         pings.Add(state.ping);
                         bandwidths.Add(state.bandwidth);
                     }
 
-                    if (teamQualities.Count == 0)
+                    if (teamLosses.Count == 0)
                     {
-                        teamQualities.Add(1);
+                        teamLosses.Add(1);
                         teamPings.Add(0);
                         teamBandwidths.Add(0);
                     }
 
-                    if (qualities.Count == 0)
+                    if (losses.Count == 0)
                     {
-                        qualities.Add(1);
+                        losses.Add(1);
                         pings.Add(0);
                         bandwidths.Add(0);
                     }
 
                     NetworkStatus teamStatus = new()
                     {
-                        avgQuality = teamQualities.Average(),
-                        minQuality = teamQualities.Min(),
+                        avgLoss = teamLosses.Average(),
+                        maxLoss = teamLosses.Min(),
 
                         avgPing = (int)teamPings.Average(),
                         maxPing = teamPings.Max(),
@@ -139,8 +139,8 @@ namespace NuclearVOIP
 
                     NetworkStatus allStatus = new()
                     {
-                        avgQuality = qualities.Average(),
-                        minQuality = qualities.Min(),
+                        avgLoss = losses.Average(),
+                        maxLoss = losses.Min(),
 
                         avgPing = (int)pings.Average(),
                         maxPing = pings.Max(),
