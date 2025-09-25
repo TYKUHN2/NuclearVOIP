@@ -18,7 +18,7 @@
     <Description>Adds VoIP to Nuclear Option</Description>
     <Copyright>All Rights Reserved 2024</Copyright>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
     <Configurations>Debug-Bep6;Release-Bep6;Debug-Bep5;Release-Bep5</Configurations>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
     <NoWarn>8618;0162;8500;BepInEx002;IDE1006</NoWarn>
@@ -96,7 +96,7 @@
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Compile Remove="crc/**/*.cs" />
-    <Compile Remove="Ogg*.cs" />
+    <!--<Compile Remove="crc/**/*.cs" />-->
+    <!--<Compile Remove="Ogg*.cs" />-->
   </ItemGroup>
 </Project>
