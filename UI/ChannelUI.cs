@@ -1,7 +1,12 @@
-﻿using BepInEx.Unity.Mono.Configuration;
-using System.Linq;
+﻿using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+
+#if BEP5
+using BepInEx.Configuration;
+#elif BEP6
+using BepInEx.Unity.Mono.Configuration;
+#endif
 
 namespace NuclearVOIP.UI
 {
