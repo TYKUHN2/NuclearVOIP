@@ -6,9 +6,9 @@ using BepInEx.Logging;
 using Steamworks;
 using UnityEngine;
 using AtomicFramework;
+using NuclearOption.Networking;
 
 #if BEP6
-using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
 #endif
 
@@ -47,7 +47,6 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<KeyboardShortcut> configAllTalkKey;
         internal readonly ConfigEntry<KeyboardShortcut> configChannelKey;
 
-        internal readonly ConfigEntry<int> configVOIPPort;
         internal readonly ConfigEntry<float> configInputGain;
         internal readonly ConfigEntry<float> configOutputGain;
 
@@ -93,17 +92,10 @@ namespace NuclearVOIP
                     "Change talk channel"
                 );
 
-            configVOIPPort = Config.Bind(
-                    "General",
-                    "VOIP Port",
-                    5000,
-                    "The port to discover and transmit voice chat on"
-                );
-
             configInputGain = Config.Bind(
                     "General",
                     "Microphone Gain",
-                    1.0f,
+                    2.0f,
                     "A (linear) multiplier applied to microphone readings"
                 );
 
@@ -138,7 +130,7 @@ namespace NuclearVOIP
         private void LateLoad()
         {
             Logger.LogInfo($"LateLoading {MyPluginInfo.PLUGIN_GUID}");
-            if (!SteamManager.Initialized)
+            if (!SteamManager.ClientInitialized)
             {
                 Logger.LogWarning("Disabling VOIP: steam is not initalized");
                 return;
@@ -170,7 +162,8 @@ namespace NuclearVOIP
 
         private void LoadingFinished()
         {
-            GameObject host = GameManager.LocalPlayer.gameObject;
+            GameManager.GetLocalPlayer(out Player localPlayer);
+            GameObject host = localPlayer.gameObject;
             NetworkSystem networkSystem = host.AddComponent<NetworkSystem>();
             CommSystem comms = host.AddComponent<CommSystem>();
 

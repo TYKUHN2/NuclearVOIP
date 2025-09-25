@@ -101,7 +101,8 @@ namespace NuclearVOIP
                     {
                         NetworkStatistics state = chan.GetStatistics(identity);
 
-                        if (peer.HQ == GameManager.LocalFactionHQ)
+                        GameManager.GetLocalHQ(out FactionHQ localHq);
+                        if (peer.HQ == localHq)
                         {
                             teamLosses.Add(state.packetLoss);
                             teamPings.Add(state.ping);
@@ -164,7 +165,7 @@ namespace NuclearVOIP
 
         public void SendToTeam(byte[] data)
         {
-            FactionHQ ourHQ = GameManager.LocalFactionHQ;
+            GameManager.GetLocalHQ(out FactionHQ ourHQ);
             Player[] team = [..ourHQ.GetPlayers(false)];
 
             foreach (ulong identity in connections)
