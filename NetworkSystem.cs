@@ -1,4 +1,4 @@
-﻿using AtomicFramework;
+using AtomicFramework;
 using NuclearOption.Networking;
 using System;
 using System.Collections.Generic;
@@ -28,6 +28,8 @@ namespace NuclearVOIP
 
         private void Awake()
         {
+            Plugin.Logger.LogDebug("Initializing NetworkSystem");
+
             if (Plugin.Instance.Networking == null)
             {
                 Destroy(this);

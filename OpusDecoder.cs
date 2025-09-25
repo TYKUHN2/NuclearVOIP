@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 //using UnityEngine;
@@ -52,11 +53,18 @@ namespace NuclearVOIP
 
         protected override float[] Transform(byte[][] data)
         {
+            Stopwatch sw = Stopwatch.StartNew();
+
             float[][] decoded = new float[data.Length][];
             for (int i = 0; i < data.Length; i++)
                 decoded[i] = DoDecode(data[i]);
 
-            return decoded.SelectMany(a => a).ToArray();
+            sw.Stop();
+
+            if (sw.ElapsedMilliseconds > 20)
+                Plugin.Logger.LogDebug("Decoder exceeded RT threshold.");
+
+            return [.. decoded.SelectMany(a => a)];
         }
 
         private float[] DoDecode(byte[] packet)
@@ -97,7 +105,8 @@ namespace NuclearVOIP
             }
 
             Array.Resize(ref decoded, err);
-            return decoded;
+
+            return decoded[312..]; // Encoder current lookahead 312
         }
 
         private void SetCtl(LibOpus.DecoderCtl ctl, int val)

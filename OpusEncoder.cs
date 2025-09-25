@@ -1,4 +1,7 @@
+//#define DECODER_TEST
+
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 //using UnityEngine;
@@ -8,14 +11,15 @@ namespace NuclearVOIP
     internal class OpusEncoder: AbstractTransform<float, byte[]>
     {
         //private int frame = 0;
-
-        private const bool DECODER_TEST = false;
         private readonly IntPtr encoder;
-        private readonly IntPtr decoder;
-        private bool decoder_good = true;
         private readonly int frameSize;
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
         private bool closed = false;
+
+#if DECODER_TEST
+        private readonly IntPtr decoder;
+        private bool decoder_good = true;
+#endif
 
         private float[]? leftover;
 
@@ -105,7 +109,7 @@ namespace NuclearVOIP
             }
         }
 
-        unsafe public OpusEncoder(int frequency)
+        public OpusEncoder(int frequency)
         {
             frameSize = (int)(0.02 * frequency);
 
@@ -117,17 +121,16 @@ namespace NuclearVOIP
                 throw new LibOpus.OpusException(err);
             }
 
-            if (DECODER_TEST)
+#if DECODER_TEST
+            decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
+            err = LibOpus.opus_decoder_init(decoder, frequency, 1);
+            if (err != 0)
             {
-                decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
-                err = LibOpus.opus_decoder_init(decoder, frequency, 1);
-                if (err != 0)
-                {
-                    Marshal.FreeHGlobal(encoder);
-                    Marshal.FreeHGlobal(decoder);
-                    throw new LibOpus.OpusException(err);
-                }
+                Marshal.FreeHGlobal(encoder);
+                Marshal.FreeHGlobal(decoder);
+                throw new LibOpus.OpusException(err);
             }
+#endif
 
             BitRate = 24000;
             //FEC = LibOpus.FEC.AGGRESSIVE;
@@ -140,8 +143,9 @@ namespace NuclearVOIP
         {
             Marshal.FreeHGlobal(encoder);
 
-            if (DECODER_TEST)
-                Marshal.FreeHGlobal(decoder);
+#if DECODER_TEST
+            Marshal.FreeHGlobal(decoder);
+#endif
         }
 
         private byte[][] DoEncode(StreamArgs<float> args)
@@ -177,6 +181,8 @@ namespace NuclearVOIP
                     frame = Time.frameCount;
                 }*/
 
+                Stopwatch sw = Stopwatch.StartNew();
+
                 float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
                 int mod = rawFrames.Length % frameSize;
@@ -198,6 +204,11 @@ namespace NuclearVOIP
                     offset += frameSize;
                     encoded[i] = EncodeFrame(rawFrames[offset..(offset + frameSize)]);
                 }
+
+                sw.Stop();
+
+                if (sw.ElapsedMilliseconds > 20)
+                    Plugin.Logger.LogDebug("Warning! Opus encoding exceeded frametime!");
 
                 return encoded;
             }
@@ -236,7 +247,7 @@ namespace NuclearVOIP
             return DoEncode(new(samples));
         }
 
-        private unsafe byte[] EncodeFrame(float[] samples)
+        private byte[] EncodeFrame(float[] samples)
         {
             byte[] frame = new byte[4000];
 
@@ -246,14 +257,15 @@ namespace NuclearVOIP
 
             Array.Resize(ref frame, err);
 
-            if (DECODER_TEST && decoder_good)
+#if DECODER_TEST
+            if (decoder_good)
             {
                 float[] decoded = new float[5760];
                 err = LibOpus.opus_decode_float(decoder, frame, frame.Length, decoded, 5760, 0);
 
                 if (err < 0)
                 {
-                    Plugin.Logger.LogWarning("Decoder failure when verifying encoding. Disabling verification.");
+                    Plugin.Logger.LogWarning($"Decoder failure when verifying encoding. Disabling verification. {(new LibOpus.OpusException(err)).Message}");
                     decoder_good = false;
                 }
                 else
@@ -262,7 +274,11 @@ namespace NuclearVOIP
                         throw new ValidationException();
 
                     Array.Resize(ref decoded, err);
-                    for (int i = 0; i < frameSize; i++)
+
+                    LibOpus.opus_encoder_ctl(encoder, (int)LibOpus.EncoderCtl.GET_LOOKAHEAD, out int skip);
+                    decoded = decoded[skip..];
+
+                    for (int i = 0; i < frameSize - skip; i++)
                     {
                         float error = decoded[i] - samples[i];
 
@@ -276,6 +292,7 @@ namespace NuclearVOIP
                     }
                 }
             }
+#endif
 
             return frame;
         }
@@ -290,7 +307,7 @@ namespace NuclearVOIP
             }
         }
 
-        private unsafe int GetCtl(LibOpus.EncoderCtl ctl)
+        private int GetCtl(LibOpus.EncoderCtl ctl)
         {
             int err = LibOpus.opus_encoder_ctl(encoder, (int)ctl, out int result);
 

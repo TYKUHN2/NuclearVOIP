@@ -18,9 +18,12 @@ namespace NuclearVOIP
             clip = gameObject.AddComponent<StreamClip>();
 
             clip.OnReady += () => { source.Play(); };
-            clip.OnDry += () => { source.Pause(); };
+            clip.OnDry += () => {
+                Plugin.Logger.LogDebug("Ran Dry");
+                source.Pause(); 
+            };
 
-            decoder.OnData += (StreamArgs<float> args) =>
+            decoder.OnData += args =>
             {
                 args.Handle();
 
