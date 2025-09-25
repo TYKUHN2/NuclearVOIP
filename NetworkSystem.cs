@@ -1,4 +1,4 @@
-using AtomicFramework;
+﻿using AtomicFramework;
 using NuclearOption.Networking;
 using System;
 using System.Collections.Generic;
@@ -40,33 +40,35 @@ namespace NuclearVOIP
 
             chan.OnConnection += OnSession;
             chan.OnDisconnect += OnDisconnect;
+            chan.OnConnected += player =>
+            {
+                connections.Add(player);
+                NewConnection?.Invoke(player);
+            };
 
             Discovery discovery = NetworkingManager.instance!.discovery;
 
-            discovery.Ready += () =>
+            List<ulong> awaiting = [.. discovery.Players];
+
+            foreach (ulong player in discovery.Players)
             {
-                List<ulong> awaiting = [.. discovery.Players];
-
-                void OnMods(ulong player)
+                if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
                 {
-                    if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
-                    {
-                        chan.Connect(player);
-                        awaiting.Remove(player);
-                    }
+                    chan.Connect(player);
+                    awaiting.Remove(player);
                 }
+            }
 
-                foreach (ulong player in discovery.Players)
+            void OnMods(ulong player)
+            {
+                if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
                 {
-                    if (discovery.GetMods(player).Contains(MyPluginInfo.PLUGIN_GUID))
-                    {
-                        chan.Connect(player);
-                        awaiting.Remove(player);
-                    }
+                    chan.Connect(player);
+                    awaiting.Remove(player);
                 }
+            }
 
-                discovery.ModsAvailable += OnMods;
-            };
+            discovery.ModsAvailable += OnMods;
 
             chan.OnMessage += OnMessage;
         }
@@ -90,7 +92,7 @@ namespace NuclearVOIP
                 for (int i = 0; i < connections.Count; i++)
                 {
                     ulong identity = connections[i];
-                    Player peer = NetworkingManager.instance!.GetPlayer(identity)!;
+                    Player peer = NetworkingManager.GetPlayer(identity)!;
 
                     if (ChatManager.IsMuted(peer))
                     {
@@ -184,17 +186,17 @@ namespace NuclearVOIP
             chan.Send(target, data, true);
         }
 
+        public void SendToSlow(ulong target, byte[] data)
+        {
+            chan.Send(target, data);
+        }
+
         private bool OnSession(ulong player)
         {
-            Player? playerObj = NetworkManagerNuclearOption.i.GamePlayers
-                .Where(a => a.SteamID == player)
-                .FirstOrDefault();
+            Player? playerObj = NetworkingManager.GetPlayer(player);
 
             if (playerObj != null && !ChatManager.IsMuted(playerObj)) // TODO: When a player is unmuted (might need a patch) retry connection
-            {
-                NewConnection?.Invoke(player);
                 return true;
-            }
             else
             {
                 Plugin.Logger.LogWarning("Received P2P request from random user");

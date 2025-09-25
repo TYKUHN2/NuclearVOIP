@@ -66,7 +66,7 @@ namespace NuclearVOIP
             networking.ConnectionLost += EndStream;
             networking.NewConnection += player =>
             {
-                networking.SendTo(player, [(byte)Commands.HANDSHAKE, .. (BitConverter.GetBytes(VERSION))]);
+                networking.SendToSlow(player, [(byte)Commands.HANDSHAKE, .. (BitConverter.GetBytes(VERSION))]);
             };
             networking.OnNetworkMeasurement += comms.UpdateStatus;
         }

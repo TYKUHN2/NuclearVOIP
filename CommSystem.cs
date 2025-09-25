@@ -5,7 +5,6 @@ using System.Linq;
 using UnityEngine;
 using System.Reflection;
 
-
 #if BEP6
 using BepInEx.Unity.Mono.Configuration;
 #elif BEP5
@@ -137,7 +136,7 @@ namespace NuclearVOIP
             newObj.transform.parent = gameObject.transform;
 
             StreamPlayer sPlayer = newObj.AddComponent<StreamPlayer>();
-            sPlayer.decoder.Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256);
+            sPlayer.decoder.Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256, MidpointRounding.AwayFromZero);
 
             players[player] = sPlayer;
 
