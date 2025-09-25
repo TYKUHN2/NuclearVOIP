@@ -9,7 +9,7 @@ namespace NuclearVOIP
 {
     internal class NetworkSystem: MonoBehaviour
     {
-        private const float INTERVAL = 0.02f;
+        private const float INTERVAL = 1f;
 
         private readonly List<ulong> connections = [];
         private float elapsed = 0;
@@ -92,9 +92,9 @@ namespace NuclearVOIP
                 for (int i = 0; i < connections.Count; i++)
                 {
                     ulong identity = connections[i];
-                    Player peer = NetworkingManager.GetPlayer(identity)!;
+                    Player? peer = NetworkingManager.GetPlayer(identity);
 
-                    if (ChatManager.IsMuted(peer))
+                    if (peer != null && ChatManager.IsMuted(peer))
                     {
                         chan.Disconnect(identity);
                         ConnectionLost?.Invoke(identity);
@@ -104,7 +104,7 @@ namespace NuclearVOIP
                         NetworkStatistics state = chan.GetStatistics(identity);
 
                         GameManager.GetLocalHQ(out FactionHQ localHq);
-                        if (peer.HQ == localHq)
+                        if (peer?.HQ == localHq)
                         {
                             teamLosses.Add(state.packetLoss);
                             teamPings.Add(state.ping);
@@ -133,7 +133,7 @@ namespace NuclearVOIP
                     NetworkStatus teamStatus = new()
                     {
                         avgLoss = teamLosses.Average(),
-                        maxLoss = teamLosses.Min(),
+                        maxLoss = teamLosses.Max(),
 
                         avgPing = (int)teamPings.Average(),
                         maxPing = teamPings.Max(),
@@ -145,7 +145,7 @@ namespace NuclearVOIP
                     NetworkStatus allStatus = new()
                     {
                         avgLoss = losses.Average(),
-                        maxLoss = losses.Min(),
+                        maxLoss = losses.Max(),
 
                         avgPing = (int)pings.Average(),
                         maxPing = pings.Max(),

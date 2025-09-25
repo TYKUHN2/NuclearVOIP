@@ -106,7 +106,7 @@ namespace NuclearVOIP
 
             Array.Resize(ref decoded, err);
 
-            return decoded[312..]; // Encoder current lookahead 312
+            return decoded;
         }
 
         private void SetCtl(LibOpus.DecoderCtl ctl, int val)
