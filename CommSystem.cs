@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using System.Reflection;
+using NuclearOption.Networking;
+
 
 
 #if BEP6
@@ -102,7 +104,8 @@ namespace NuclearVOIP
 
                 listener.enabled = true;
 
-                talkingList!.AddPlayer(GameManager.LocalPlayer);
+                GameManager.GetLocalPlayer(out Player localPlayer);
+                talkingList!.AddPlayer(localPlayer);
 
                 OnTarget?.Invoke(talkKey.IsDown() ? OpusMultiStreamer.Target.TEAM : OpusMultiStreamer.Target.GLOBAL);
             }
@@ -111,7 +114,8 @@ namespace NuclearVOIP
                 listener!.enabled = false;
                 encoder = null;
 
-                talkingList!.RemovePlayer(GameManager.LocalPlayer);
+                GameManager.GetLocalPlayer(out Player localPlayer);
+                talkingList!.RemovePlayer(localPlayer);
 
                 OnTarget?.Invoke(OpusMultiStreamer.Target.STOPPED);
             }
@@ -147,7 +151,8 @@ namespace NuclearVOIP
                 .First()
                 .Value;
 
-            if (playerObj != GameManager.LocalPlayer) // DebugNetworkingSystem will error otherwise
+            GameManager.GetLocalPlayer(out Player localPlayer);
+            if (playerObj != localPlayer) // DebugNetworkingSystem will error otherwise
                 talkingList!.AddPlayer(playerObj);
 
             sPlayer.curModifier = JamModifier;
@@ -170,7 +175,8 @@ namespace NuclearVOIP
                 .First()
                 .Value;
 
-            if (playerObj != GameManager.LocalPlayer) // DebugNetworkingSystem will error otherwise
+            GameManager.GetLocalPlayer(out Player localPlayer);
+            if (playerObj != localPlayer) // DebugNetworkingSystem will error otherwise
                 talkingList!.RemovePlayer(playerObj);
         }
 
@@ -212,7 +218,8 @@ namespace NuclearVOIP
 
         private void JamModifier(ref float[] samples)
         {
-            Radar? radar = (Radar?)GameManager.LocalAircraft?.radar;
+            GameManager.GetLocalAircraft(out Aircraft? localAircraft);
+            Radar? radar = (Radar?)localAircraft?.radar;
 
             if (radar == null) return;
 

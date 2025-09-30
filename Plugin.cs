@@ -5,9 +5,9 @@ using System.Threading;
 using BepInEx.Logging;
 using Steamworks;
 using UnityEngine;
+using NuclearOption.Networking;
 
 #if BEP6
-using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
 #endif
 
@@ -107,7 +107,7 @@ namespace NuclearVOIP
             configInputGain = Config.Bind(
                     "General",
                     "Microphone Gain",
-                    1.0f,
+                    2.0f,
                     "A (linear) multiplier applied to microphone readings"
                 );
 
@@ -142,7 +142,7 @@ namespace NuclearVOIP
         private void LateLoad()
         {
             Logger.LogInfo($"LateLoading {MyPluginInfo.PLUGIN_GUID}");
-            if (!SteamManager.Initialized)
+            if (!SteamManager.ClientInitialized)
             {
                 Logger.LogWarning("Disabling VOIP: steam is not initalized");
                 return;
@@ -174,12 +174,13 @@ namespace NuclearVOIP
 
         private void LoadingFinished()
         {
-            if (NET_DEBUG || GameManager.gameState != GameManager.GameState.Singleplayer)
+            if (NET_DEBUG || GameManager.gameState != GameState.SinglePlayer)
             {
-                GameObject host = GameManager.LocalPlayer.gameObject;
+                GameManager.GetLocalPlayer(out Player localPlayer);
+                GameObject host = localPlayer.gameObject;
                 INetworkSystem networkSystem;
 
-                if (NET_DEBUG && GameManager.gameState == GameManager.GameState.Singleplayer)
+                if (NET_DEBUG && GameManager.gameState == GameState.SinglePlayer)
                     networkSystem = host.AddComponent<DebugNetworkSystem>();
                 else
                     networkSystem = host.AddComponent<NetworkSystem>();

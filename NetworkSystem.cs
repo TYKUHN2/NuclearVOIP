@@ -103,7 +103,8 @@ namespace NuclearVOIP
                             continue;
                         }
 
-                        if (peer.HQ == GameManager.LocalFactionHQ)
+                        GameManager.GetLocalHQ(out FactionHQ localHq);
+                        if (peer.HQ == localHq)
                         {
                             teamQualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
                             teamPings.Add(status.m_nPing);
@@ -206,7 +207,7 @@ namespace NuclearVOIP
 
         public void SendToTeam(byte[] data)
         {
-            FactionHQ ourHQ = GameManager.LocalFactionHQ;
+            GameManager.GetLocalHQ(out FactionHQ ourHQ);
             Player[] team = [..ourHQ.GetPlayers(false)];
 
             foreach (SteamNetworkingIdentity identity in connections)
