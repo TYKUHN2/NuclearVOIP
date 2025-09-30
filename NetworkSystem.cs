@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -10,7 +10,7 @@ namespace NuclearVOIP
 {
     internal class NetworkSystem: MonoBehaviour, INetworkSystem
     {
-        private const float INTERVAL = 0.02f;
+        private const float INTERVAL = 1f;
 
         private readonly int channel = Plugin.Instance.configVOIPPort.Value;
         private readonly List<SteamNetworkingIdentity> connections = [];
@@ -81,7 +81,7 @@ namespace NuclearVOIP
                         .First()
                         .Value;
 
-                    if (ChatManager.IsMuted(peer))
+                    if (peer != null && ChatManager.IsMuted(peer))
                     {
                         SteamNetworkingMessages.CloseChannelWithUser(ref identity, channel);
 
@@ -104,7 +104,7 @@ namespace NuclearVOIP
                         }
 
                         GameManager.GetLocalHQ(out FactionHQ localHq);
-                        if (peer.HQ == localHq)
+                        if (peer?.HQ == localHq)
                         {
                             teamQualities.Add(Math.Min(status.m_flConnectionQualityLocal, status.m_flConnectionQualityRemote));
                             teamPings.Add(status.m_nPing);

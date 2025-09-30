@@ -97,6 +97,7 @@ namespace NuclearVOIP
             }
 
             Array.Resize(ref decoded, err);
+
             return decoded;
         }
 
