@@ -97,6 +97,7 @@ namespace NuclearVOIP
             }
         }
 
+        // Use StopWatch to ensure we stay under 20ms, adjust complexity as needed
         public int Complexity
         {
             get

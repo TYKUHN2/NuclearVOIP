@@ -77,7 +77,7 @@ namespace NuclearVOIP
         public static extern int opus_decoder_init(IntPtr decoder, int freq, int channels);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
-        public static extern int opus_decode_float(IntPtr decoder, byte[] data, int length, float[] pcm, int frame_size, int fec);
+        public static extern int opus_decode_float(IntPtr decoder, byte[]? data, int length, float[] pcm, int frame_size, int fec);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int opus_decoder_ctl(IntPtr decoder, int req, int val); // vararg not fun

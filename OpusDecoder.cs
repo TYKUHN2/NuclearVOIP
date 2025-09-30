@@ -9,6 +9,8 @@ namespace NuclearVOIP
     internal class OpusDecoder: AbstractTransform<byte[], float>
     {
         private readonly IntPtr decoder;
+        private bool packetLost = false;
+
         //private int frame = 0;
 
         public int Gain
@@ -23,6 +25,7 @@ namespace NuclearVOIP
             }
         }
 
+        // Use StopWatch to ensure we stay under 20ms, adjust complexity as needed
         public int Complexity
         {
             get
@@ -69,7 +72,6 @@ namespace NuclearVOIP
 
         private float[] DoDecode(byte[] packet)
         {
-
             /*if (frame > (Time.frameCount + 5)) // Only update every 6 frames, supports roll over.
             {
                 int curComplexity = Complexity; // Avoid repeatedly fetching
@@ -94,10 +96,43 @@ namespace NuclearVOIP
                 frame = Time.frameCount;
             }*/
 
+            if (packet.Length == 1 && packet[0] == 13) // DTX/Lost packet
+            {
+                packetLost = true;
+                return [];
+            } 
+            else
+            {
+                float[] prefix = [];
+                float[] decoded = new float[5760];
+
+                if (packetLost)
+                    prefix = RecoverPacket(packet);
+
+                int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 0);
+                if (err < 0)
+                {
+                    Marshal.FreeHGlobal(decoder);
+                    throw new LibOpus.OpusException(err);
+                }
+
+                Array.Resize(ref decoded, err);
+                return [..prefix, ..decoded];
+            }
+        }
+
+        private float[] RecoverPacket(byte[] packet)
+        {
             float[] decoded = new float[5760];
 
             int fec = LibOpus.opus_packet_has_lbrr(packet, packet.Length);
-            int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, fec);
+            int err;
+
+            if (fec == 1)
+                err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 1);
+            else
+                err = LibOpus.opus_decode_float(decoder, null, 0, decoded, 5760, 0);
+
             if (err < 0)
             {
                 Marshal.FreeHGlobal(decoder);

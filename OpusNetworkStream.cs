@@ -6,6 +6,7 @@ namespace NuclearVOIP
 {
     internal class OpusNetworkStream(Action<byte[][]> handler)
     {
+        // TODO: Stronger typed dead packets so that we can properly use FEC/LBRR
         private static readonly byte[] deadPacket = [13]; // DTX / Lost packet
 
         private readonly Action<byte[][]> handler = handler;
