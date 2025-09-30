@@ -2,6 +2,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 //using UnityEngine;
@@ -15,6 +16,9 @@ namespace NuclearVOIP
         private readonly int frameSize;
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
         private bool closed = false;
+
+        private byte costi = 0;
+        private readonly int[] costs = new int[6];
 
 #if DECODER_TEST
         private readonly IntPtr decoder;
@@ -158,32 +162,6 @@ namespace NuclearVOIP
             {
                 args.Handle();
 
-                /*if (frame > (Time.frameCount + 5)) // Only update every 6 frames, supports roll over.
-                {
-                    int curComplexity = Complexity; // Avoid repeatedly fetching
-                    int framerate = Plugin.Instance.FrameRate;
-
-                    if (QualitySettings.vSyncCount == 1)
-                    {
-                        int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
-
-                        if (difference >= 3 && curComplexity > 0)
-                            Complexity = curComplexity - 1;
-                        else if (difference <= 1 && curComplexity < 10)
-                            Complexity = curComplexity + 1;
-                    }
-                    else if (framerate < 20 && curComplexity > 1)
-                        Complexity = curComplexity - 2;
-                    else if (framerate < 50 && curComplexity > 0)
-                        Complexity = curComplexity - 1;
-                    else if (framerate > 70 && curComplexity < 10)
-                        Complexity = curComplexity + 1;
-
-                    frame = Time.frameCount;
-                }*/
-
-                Stopwatch sw = Stopwatch.StartNew();
-
                 float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
                 int mod = rawFrames.Length % frameSize;
@@ -205,11 +183,6 @@ namespace NuclearVOIP
                     offset += frameSize;
                     encoded[i] = EncodeFrame(rawFrames[offset..(offset + frameSize)]);
                 }
-
-                sw.Stop();
-
-                if (sw.ElapsedMilliseconds > 20)
-                    Plugin.Logger.LogDebug("Warning! Opus encoding exceeded frametime!");
 
                 return encoded;
             }
@@ -252,9 +225,30 @@ namespace NuclearVOIP
         {
             byte[] frame = new byte[4000];
 
+            Stopwatch sw = Stopwatch.StartNew();
+
             int err = LibOpus.opus_encode_float(encoder, samples, frameSize, frame, 4000);
             if (err < 0)
                 throw new LibOpus.OpusException(err);
+
+            sw.Stop();
+
+            if (sw.ElapsedMilliseconds > 20)
+                Plugin.Logger.LogDebug("Warning! Opus encoding exceeded frametime!");
+
+            costs[costi++] = (int)sw.ElapsedMilliseconds;
+
+            if (costi == 6)
+            {
+                costi = 0;
+
+                int avgCost = (int)Math.Ceiling(costs.Average());
+
+                if (avgCost > 40) // On average we are two or more packets too slow
+                    Complexity -= 2;
+                else if (avgCost > 20) // On average we are one packet too slow
+                    Complexity -= 1;
+            }
 
             Array.Resize(ref frame, err);
 

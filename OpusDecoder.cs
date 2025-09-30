@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-//using UnityEngine;
 
 namespace NuclearVOIP
 {
@@ -11,7 +10,8 @@ namespace NuclearVOIP
         private readonly IntPtr decoder;
         private bool packetLost = false;
 
-        //private int frame = 0;
+        private byte costi = 0;
+        private readonly int[] costs = new int[6];
 
         public int Gain
         {
@@ -56,46 +56,15 @@ namespace NuclearVOIP
 
         protected override float[] Transform(byte[][] data)
         {
-            Stopwatch sw = Stopwatch.StartNew();
-
             float[][] decoded = new float[data.Length][];
             for (int i = 0; i < data.Length; i++)
                 decoded[i] = DoDecode(data[i]);
-
-            sw.Stop();
-
-            if (sw.ElapsedMilliseconds > 20)
-                Plugin.Logger.LogDebug("Decoder exceeded RT threshold.");
 
             return [.. decoded.SelectMany(a => a)];
         }
 
         private float[] DoDecode(byte[] packet)
         {
-            /*if (frame > (Time.frameCount + 5)) // Only update every 6 frames, supports roll over.
-            {
-                int curComplexity = Complexity; // Avoid repeatedly fetching
-                int framerate = Plugin.Instance.FrameRate;
-
-                if (QualitySettings.vSyncCount == 1)
-                {
-                    int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
-
-                    if (difference >= 3 && curComplexity > 0)
-                        Complexity = curComplexity - 1;
-                    else if (difference <= 1 && curComplexity < 10)
-                        Complexity = curComplexity + 1;
-                }
-                else if (framerate < 20 && curComplexity > 1)
-                    Complexity = curComplexity - 2;
-                else if (framerate < 50 && curComplexity > 0)
-                    Complexity = curComplexity - 1;
-                else if (framerate > 70 && curComplexity < 10)
-                    Complexity = curComplexity + 1;
-
-                frame = Time.frameCount;
-            }*/
-
             if (packet.Length == 1 && packet[0] == 13) // DTX/Lost packet
             {
                 packetLost = true;
@@ -109,11 +78,32 @@ namespace NuclearVOIP
                 if (packetLost)
                     prefix = RecoverPacket(packet);
 
+                Stopwatch sw = Stopwatch.StartNew();
+
                 int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 0);
                 if (err < 0)
                 {
                     Marshal.FreeHGlobal(decoder);
                     throw new LibOpus.OpusException(err);
+                }
+
+                sw.Stop();
+
+                if (sw.ElapsedMilliseconds > 20)
+                    Plugin.Logger.LogDebug("Decoder exceeded RT threshold.");
+
+                costs[costi++] = (int)sw.ElapsedMilliseconds;
+
+                if (costi == 6)
+                {
+                    costi = 0;
+
+                    int avgCost = (int)Math.Ceiling(costs.Average());
+
+                    if (avgCost > 40) // On average we are two or more packets too slow
+                        Complexity -= 2;
+                    else if (avgCost > 20) // On average we are one packet too slow
+                        Complexity -= 1;
                 }
 
                 Array.Resize(ref decoded, err);
