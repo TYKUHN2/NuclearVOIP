@@ -10,7 +10,7 @@ namespace NuclearVOIP
 {
     internal class DebugNetworkSystem: MonoBehaviour, INetworkSystem
     {
-        private readonly CSteamID steamID = new(GameManager.LocalPlayer.SteamID);
+        private readonly CSteamID steamID = SteamUser.GetSteamID();
         private readonly int channel = Plugin.Instance.configVOIPPort.Value;
 
         private readonly HSteamNetConnection send;

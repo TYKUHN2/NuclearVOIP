@@ -7,7 +7,9 @@ using Steamworks;
 using UnityEngine;
 using NuclearOption.Networking;
 
+
 #if BEP6
+using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
 #endif
 

@@ -30,9 +30,10 @@ namespace NuclearVOIP
             messageFailed = Callback<SteamNetworkingMessagesSessionFailed_t>.Create(OnDisconnect);
 
             Player[] players = [..UnitRegistry.playerLookup.Values];
+            GameManager.GetLocalPlayer(out Player localPlayer);
             foreach (Player player in players)
             {
-                if (player == GameManager.LocalPlayer)
+                if (player == localPlayer)
                     continue;
 
                 SteamNetworkingIdentity target = new()
