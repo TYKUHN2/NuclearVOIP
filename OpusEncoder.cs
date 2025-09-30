@@ -137,9 +137,8 @@ namespace NuclearVOIP
             }
 #endif
 
-            BitRate = 24000;
-            //FEC = LibOpus.FEC.AGGRESSIVE;
             //DTX = true;
+            BitRate = 32000;
             Signal = LibOpus.Signal.VOICE;
             lookahead = GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD);
         }
@@ -238,7 +237,7 @@ namespace NuclearVOIP
 
             costs[costi++] = (int)sw.ElapsedMilliseconds;
 
-            if (costi == 6)
+            if (costi == costs.Length)
             {
                 costi = 0;
 
