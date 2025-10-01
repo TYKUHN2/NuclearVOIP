@@ -16,6 +16,8 @@ namespace NuclearVOIP
 
         private byte[][]? delayed;
 
+        //private readonly Random rand = new();
+
         public byte Loss
         {
             get
@@ -57,6 +59,11 @@ namespace NuclearVOIP
                     Plugin.Logger.LogWarning("VOIP packet truncated");
                     break;
                 }
+
+                /*if (rand.NextDouble() >= 0.4) // 40% packet loss
+                    packets.AddLast(packet);
+                else
+                    packets.AddLast(deadPacket);*/
 
                 packets.AddLast(packet);
             }

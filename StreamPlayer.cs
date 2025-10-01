@@ -17,6 +17,8 @@ namespace NuclearVOIP
             source = gameObject.AddComponent<AudioSource>();
             clip = gameObject.AddComponent<StreamClip>();
 
+
+            // Implement jitter buffer by delayig OnDry and OnReady
             clip.OnReady += () => { source.Play(); };
             clip.OnDry += () => {
                 Plugin.Logger.LogDebug("Ran Dry");

@@ -50,6 +50,8 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<float> configInputGain;
         internal readonly ConfigEntry<float> configOutputGain;
 
+        internal readonly ConfigEntry<bool> configUseFEC;
+
         private float[] deltas = new float[10];
 
         public int FrameRate
@@ -104,6 +106,13 @@ namespace NuclearVOIP
                     "Output Gain",
                     1.0f,
                     "A (in dB) multiplier applied to incoming voice"
+                );
+
+            configUseFEC = Config.Bind(
+                    "General",
+                    "Use FEC",
+                    true,
+                    "Enables (or disables) use of FEC and PLC to compensate for packet loss."
                 );
 
             LoadingManager.GameLoaded += LateLoad;

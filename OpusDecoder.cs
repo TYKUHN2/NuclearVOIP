@@ -65,7 +65,7 @@ namespace NuclearVOIP
 
         private float[] DoDecode(byte[] packet)
         {
-            if (packet.Length == 1 && packet[0] == 13) // DTX/Lost packet
+            if (packet.Length <= 2) // DTX/Lost packet
             {
                 packetLost = true;
                 return [];
@@ -75,7 +75,7 @@ namespace NuclearVOIP
                 float[] prefix = [];
                 float[] decoded = new float[5760];
 
-                if (packetLost)
+                if (packetLost && Plugin.Instance.configUseFEC.Value)
                     prefix = RecoverPacket(packet);
 
                 Stopwatch sw = Stopwatch.StartNew();
