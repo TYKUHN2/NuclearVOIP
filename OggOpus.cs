@@ -20,7 +20,7 @@ namespace NuclearVOIP
             oggStream = new Ogg.Stream(file);
             samplesPerFrame = msPerPacket * 48;
             encoder = new(frequency);
-            base.Write(EncodeOpusHeaders(channels, (short)encoder.lookahead));
+            base.Write(EncodeOpusHeaders(channels, (short)encoder.LookAhead));
 
             frames.OnData += OnFrame;
             encoder.Pipe(this);

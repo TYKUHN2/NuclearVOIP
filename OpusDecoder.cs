@@ -1,88 +1,23 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.InteropServices;
+using LibOpus;
 
 namespace NuclearVOIP
 {
     internal class OpusDecoder: AbstractTransform<byte[], float>
     {
-        private readonly IntPtr decoder;
+        private readonly Decoder decoder = new(48000, 1)
+        {
+            BWE = true,
+            Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256, MidpointRounding.AwayFromZero),
+            Complexity = 10
+        };
+
         private bool packetLost = false;
 
         private byte costi = 0;
         private readonly int[] costs = new int[6];
-
-        public int Gain
-        {
-            get
-            {
-                return GetCtl(LibOpus.DecoderCtl.GET_GAIN);
-            }
-            set
-            {
-                SetCtl(LibOpus.DecoderCtl.SET_GAIN, value);
-            }
-        }
-
-        // Use StopWatch to ensure we stay under 20ms, adjust complexity as needed
-        public int Complexity
-        {
-            get
-            {
-                return GetCtl(LibOpus.DecoderCtl.GET_COMPLEXITY);
-            }
-            set
-            {
-                SetCtl(LibOpus.DecoderCtl.SET_COMPLEXITY, value);
-            }
-        }
-
-        public bool BWE
-        {
-            get
-            {
-                return GetCtl(LibOpus.DecoderCtl.GET_OSCE_BWE) == 1;
-            }
-            set
-            {
-                SetCtl(LibOpus.DecoderCtl.SET_OSCE_BWE, value ? 1 : 0);
-            }
-        }
-
-        public bool LACE
-        {
-            get
-            {
-                return Complexity == 6;
-            }
-        }
-
-        public bool NoLACE
-        {
-            get
-            {
-                return Complexity >= 7;
-            }
-        }
-
-        public OpusDecoder()
-        {
-            decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
-            int err = LibOpus.opus_decoder_init(decoder, 48000, 1);
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(decoder);
-                throw new LibOpus.OpusException(err);
-            }
-
-            BWE = true;
-        }
-
-        ~OpusDecoder()
-        {
-            Marshal.FreeHGlobal(decoder);
-        }
 
         protected override float[] Transform(byte[][] data)
         {
@@ -102,25 +37,18 @@ namespace NuclearVOIP
             } 
             else
             {
-                float[] prefix = [];
-                float[] decoded = new float[5760];
-
-                if (packetLost && Plugin.Instance.configUseFEC.Value)
-                    prefix = RecoverPacket(packet);
-
                 Stopwatch sw = Stopwatch.StartNew();
 
-                int err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 0);
-                if (err < 0)
-                {
-                    Marshal.FreeHGlobal(decoder);
-                    throw new LibOpus.OpusException(err);
-                }
+                float[] prefix;
+
+                if (packetLost && Plugin.Instance.configUseFEC.Value)
+                    prefix = decoder.DecodeLoss(packet, 20 /* TODO */);
+                else
+                    prefix = [];
+
+                float[] decoded = decoder.Decode(packet);
 
                 sw.Stop();
-
-                if (sw.ElapsedMilliseconds > 20)
-                    Plugin.Logger.LogDebug("Decoder exceeded RT threshold.");
 
                 costs[costi++] = (int)sw.ElapsedMilliseconds;
 
@@ -131,60 +59,13 @@ namespace NuclearVOIP
                     int avgCost = (int)Math.Ceiling(costs.Average());
 
                     if (avgCost > 40) // On average we are two or more packets too slow
-                        Complexity -= 2;
+                        decoder.Complexity -= 2;
                     else if (avgCost > 20) // On average we are one packet too slow
-                        Complexity -= 1;
+                        decoder.Complexity -= 1;
                 }
 
-                Array.Resize(ref decoded, err);
                 return [..prefix, ..decoded];
             }
-        }
-
-        private float[] RecoverPacket(byte[] packet)
-        {
-            float[] decoded = new float[5760];
-
-            int fec = LibOpus.opus_packet_has_lbrr(packet, packet.Length);
-            int err;
-
-            if (fec == 1)
-                err = LibOpus.opus_decode_float(decoder, packet, packet.Length, decoded, 5760, 1);
-            else
-                err = LibOpus.opus_decode_float(decoder, null, 0, decoded, 5760, 0);
-
-            if (err < 0)
-            {
-                Marshal.FreeHGlobal(decoder);
-                throw new LibOpus.OpusException(err);
-            }
-
-            Array.Resize(ref decoded, err);
-
-            return decoded;
-        }
-
-        private void SetCtl(LibOpus.DecoderCtl ctl, int val)
-        {
-            int err = LibOpus.opus_decoder_ctl(decoder, (int)ctl, val);
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(decoder);
-                throw new LibOpus.OpusException(err);
-            }
-        }
-
-        private unsafe int GetCtl(LibOpus.DecoderCtl ctl)
-        {
-            int err = LibOpus.opus_decoder_ctl(decoder, (int)ctl, out int result);
-
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(decoder);
-                throw new LibOpus.OpusException(err);
-            }
-
-            return result;
         }
     }
 }

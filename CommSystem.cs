@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEngine;
 using System.Reflection;
 using NuclearOption.Networking;
-
+using LibOpus;
 
 #if BEP6
 using BepInEx.Unity.Mono.Configuration;
@@ -140,7 +140,6 @@ namespace NuclearVOIP
             newObj.transform.parent = gameObject.transform;
 
             StreamPlayer sPlayer = newObj.AddComponent<StreamPlayer>();
-            sPlayer.decoder.Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256, MidpointRounding.AwayFromZero);
 
             players[player] = sPlayer;
 
@@ -213,7 +212,7 @@ namespace NuclearVOIP
             int targetBitrate = curStatus.minBandwidth == 0 ? 12000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
 
             encoder.BitRate = Math.Min(targetBitrate, 12000);
-            encoder.FEC = curStatus.avgLoss >= 0.25 ? LibOpus.FEC.AGGRESSIVE : LibOpus.FEC.DISABLED;
+            encoder.FEC = curStatus.avgLoss >= 0.25 ? OpusTypes.FEC.AGGRESSIVE : OpusTypes.FEC.DISABLED;
             encoder.PacketLoss = (int)(curStatus.avgLoss * 100);
         }
 

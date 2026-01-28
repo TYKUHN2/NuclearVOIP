@@ -1,46 +1,17 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace NuclearVOIP
+namespace LibOpus
 {
-    internal static class LibOpus
+    public static class OpusTypes
     {
+        internal static readonly int[] GOOD_FREQS = [8000, 12000, 16000, 24000, 48000];
+
         public enum Modes
         {
             VOIP = 2048,
             AUDIO = 2049,
             LOWDELAY = 2051
-        }
-
-        public enum EncoderCtl
-        {
-            SET_BITRATE = 4002,
-            GET_BITRATE = 4003,
-            SET_BANDWIDTH = 4008,
-            GET_BANDWIDTH = 4009,
-            SET_COMPLEXITY = 4010,
-            GET_COMPLEXITY = 4011,
-            SET_INBAND_FEC = 4012,
-            GET_INBAND_FEC = 4013,
-            SET_PACKET_LOSS_PERC = 4014,
-            GET_PACKET_LOSS_PERC = 4015,
-            SET_DTX = 4016,
-            GET_DTX = 4017,
-            SET_SIGNAL = 4024,
-            GET_SIGNAL = 4025,
-            GET_LOOKAHEAD = 4027,
-            SET_LSB_DEPTH = 4036,
-            GET_LSB_DEPTH = 4037,
-        }
-
-        public enum DecoderCtl
-        {
-            SET_COMPLEXITY = 4010,
-            GET_COMPLEXITY = 4011,
-            SET_GAIN = 4034,
-            GET_GAIN = 4045,
-            SET_OSCE_BWE = 4054,
-            GET_OSCE_BWE = 4055
         }
 
         public enum Signal
