@@ -1,5 +1,6 @@
 ﻿using AtomicFramework;
 using NuclearOption.Networking;
+using NuclearOption.Chat;
 using System;
 using System.Collections.Generic;
 using System.Linq;
