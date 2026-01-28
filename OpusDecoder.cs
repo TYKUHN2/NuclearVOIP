@@ -38,6 +38,34 @@ namespace NuclearVOIP
             }
         }
 
+        public bool BWE
+        {
+            get
+            {
+                return GetCtl(LibOpus.DecoderCtl.GET_OSCE_BWE) == 1;
+            }
+            set
+            {
+                SetCtl(LibOpus.DecoderCtl.SET_OSCE_BWE, value ? 1 : 0);
+            }
+        }
+
+        public bool LACE
+        {
+            get
+            {
+                return Complexity == 6;
+            }
+        }
+
+        public bool NoLACE
+        {
+            get
+            {
+                return Complexity >= 7;
+            }
+        }
+
         public OpusDecoder()
         {
             decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
@@ -47,6 +75,8 @@ namespace NuclearVOIP
                 Marshal.FreeHGlobal(decoder);
                 throw new LibOpus.OpusException(err);
             }
+
+            BWE = true;
         }
 
         ~OpusDecoder()

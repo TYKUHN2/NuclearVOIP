@@ -114,6 +114,18 @@ namespace NuclearVOIP
             }
         }
 
+        public LibOpus.Bandwidth Bandwidth
+        {
+            get
+            {
+                return (LibOpus.Bandwidth)GetCtl(LibOpus.EncoderCtl.GET_BANDWIDTH);
+            }
+            set
+            {
+                SetCtl(LibOpus.EncoderCtl.SET_BANDWIDTH, (int)value);
+            }
+        }
+
         public OpusEncoder(int frequency)
         {
             frameSize = (int)(0.02 * frequency);
@@ -138,8 +150,13 @@ namespace NuclearVOIP
 #endif
 
             //DTX = true;
-            BitRate = 32000;
-            Signal = LibOpus.Signal.VOICE;
+
+            BitRate = 12000;
+
+            Signal = LibOpus.Signal.VOICE; // We only care about voice, use SILK and benefit from BWE
+
+            Bandwidth = LibOpus.Bandwidth.WIDE; // BWE means we don't need to encode the full bandwidth
+
             lookahead = GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD);
         }
 

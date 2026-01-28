@@ -210,10 +210,10 @@ namespace NuclearVOIP
             NetworkStatus curStatus = activeKey.Equals(Plugin.Instance.configAllTalkKey.Value) ? allStatus : teamStatus;
 
             // Note: -1000 is OPUS_AUTO
-            int targetBitrate = curStatus.minBandwidth == 0 ? 32000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
+            int targetBitrate = curStatus.minBandwidth == 0 ? 12000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
 
-            encoder.BitRate = Math.Min(targetBitrate, 32000);
-            encoder.FEC = curStatus.avgLoss >= 0.25 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
+            encoder.BitRate = Math.Min(targetBitrate, 12000);
+            encoder.FEC = curStatus.avgLoss >= 0.25 ? LibOpus.FEC.AGGRESSIVE : LibOpus.FEC.DISABLED;
             encoder.PacketLoss = (int)(curStatus.avgLoss * 100);
         }
 

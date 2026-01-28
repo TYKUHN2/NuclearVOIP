@@ -16,6 +16,8 @@ namespace NuclearVOIP
         {
             SET_BITRATE = 4002,
             GET_BITRATE = 4003,
+            SET_BANDWIDTH = 4008,
+            GET_BANDWIDTH = 4009,
             SET_COMPLEXITY = 4010,
             GET_COMPLEXITY = 4011,
             SET_INBAND_FEC = 4012,
@@ -28,7 +30,7 @@ namespace NuclearVOIP
             GET_SIGNAL = 4025,
             GET_LOOKAHEAD = 4027,
             SET_LSB_DEPTH = 4036,
-            GET_LSB_DEPTH = 4037
+            GET_LSB_DEPTH = 4037,
         }
 
         public enum DecoderCtl
@@ -36,7 +38,9 @@ namespace NuclearVOIP
             SET_COMPLEXITY = 4010,
             GET_COMPLEXITY = 4011,
             SET_GAIN = 4034,
-            GET_GAIN = 4045
+            GET_GAIN = 4045,
+            SET_OSCE_BWE = 4054,
+            GET_OSCE_BWE = 4055
         }
 
         public enum Signal
@@ -51,6 +55,15 @@ namespace NuclearVOIP
             DISABLED,
             AGGRESSIVE,
             RELAXED
+        }
+
+        public enum Bandwidth
+        { 
+            NARROW = 1101,
+            MEDIUM = 1102,
+            WIDE = 1103,
+            SUPERWIDE = 1104,
+            FULL = 1105
         }
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
