@@ -46,7 +46,7 @@
   <ItemGroup Condition="'$(Configuration)'=='Debug-Bep6' Or '$(Configuration)'=='Release-Bep6'">
     <PackageReference Include="BepInEx.Unity.Mono" Version="6.0.0-be.732" IncludeAssets="compile" PrivateAssets="all" />
     <Reference Include="AtomicFramework">
-      <HintPath>..\AtomicFramework\AtomicFramework\bin\x64\Release-Bep6\netstandard2.1\AtomicFramework.dll</HintPath>
+      <HintPath>..\AtomicFramework\bin\Release-Bep6\BepInEx\plugins\AtomicFramework.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -54,7 +54,7 @@
   <ItemGroup Condition="'$(Configuration)'=='Debug-Bep5' Or '$(Configuration)'=='Release-Bep5'">
     <PackageReference Include="BepInEx.Core" Version="5.4.21" />
     <Reference Include="AtomicFramework">
-      <HintPath>..\AtomicFramework\AtomicFramework\bin\x64\Release-Bep5\netstandard2.1\AtomicFramework.dll</HintPath>
+      <HintPath>..\AtomicFramework\bin\Release-Bep5\BepInEx\plugins\AtomicFramework.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
