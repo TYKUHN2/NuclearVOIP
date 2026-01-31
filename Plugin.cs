@@ -115,8 +115,6 @@ namespace NuclearVOIP
                     true,
                     "Enables (or disables) use of FEC and PLC to compensate for packet loss."
                 );
-
-            LoadingManager.GameLoaded += LateLoad;
         }
 
         ~Plugin()
@@ -127,6 +125,7 @@ namespace NuclearVOIP
         private void Awake()
         {
             Logger.LogInfo($"Loaded {MyPluginInfo.PLUGIN_GUID}");
+            LoadingManager.NetworkReady += LateLoad;
         }
 
         private void Update()

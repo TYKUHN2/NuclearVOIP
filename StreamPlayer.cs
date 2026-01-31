@@ -35,5 +35,11 @@ namespace NuclearVOIP
                 clip.Write(samples);
             };
         }
+
+        void Destroy()
+        {
+            Destroy(clip);
+            Destroy(source);
+        }
     }
 }
