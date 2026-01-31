@@ -70,6 +70,24 @@ namespace LibOpus
         public static extern int opus_decoder_ctl(IntPtr decoder, int req, out int val); // get variant
 
 
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_decoder_get_size();
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_decoder_init(IntPtr dred);
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_get_size();
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_parse(IntPtr dred, IntPtr dpack, byte[] packet, int len, int samples, int rate, out int end, int defer);
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_decoder_dred_decode_float(IntPtr dred, IntPtr dpack, int offset, float[] pcm, int size);
+
+
+
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int opus_packet_has_lbrr(byte[] packet, int len);
 

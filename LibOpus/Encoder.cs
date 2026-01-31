@@ -27,6 +27,8 @@ namespace LibOpus
             GET_LOOKAHEAD = 4027,
             SET_LSB_DEPTH = 4036,
             GET_LSB_DEPTH = 4037,
+            SET_DRED_DURATION = 4050,
+            GET_DRED_DURATION = 4051
         }
 
         public class ValidationException : Exception
@@ -142,6 +144,18 @@ namespace LibOpus
             set
             {
                 SetCtl(EncoderCtl.SET_BANDWIDTH, (int)value);
+            }
+        }
+
+        public int DREDDuration
+        {
+            get
+            {
+                return GetCtl(EncoderCtl.GET_DRED_DURATION);
+            }
+            set
+            {
+                SetCtl(EncoderCtl.SET_DRED_DURATION, value);
             }
         }
 

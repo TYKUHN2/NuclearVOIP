@@ -42,12 +42,18 @@ namespace NuclearVOIP
             set => encoder.PacketLoss = value;
         }
 
+        public int DREDDuration
+        {
+            get => encoder.DREDDuration;
+            set => encoder.DREDDuration = value;
+        }
+
         public OpusEncoder(int frequency)
         {
             encoder = new Encoder(frequency, 1, 20, OpusTypes.Modes.VOIP)
             {
                 //DTX = true,
-                BitRate = 24000,
+                BitRate = 32000,
                 Signal = OpusTypes.Signal.VOICE, // We only care about voice, use SILK and benefit from BWE=
                 Bandwidth = OpusTypes.Bandwidth.WIDE, // BWE means we don't need to encode the full bandwidth
                 Complexity = 10

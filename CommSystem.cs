@@ -208,12 +208,20 @@ namespace NuclearVOIP
 
             NetworkStatus curStatus = activeKey.Equals(Plugin.Instance.configAllTalkKey.Value) ? allStatus : teamStatus;
 
-            // Note: -1000 is OPUS_AUTO
-            int targetBitrate = curStatus.minBandwidth == 0 ? 12000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
-
-            encoder.BitRate = Math.Min(targetBitrate, 12000);
             encoder.FEC = curStatus.avgLoss >= 0.25 ? OpusTypes.FEC.AGGRESSIVE : OpusTypes.FEC.DISABLED;
+            encoder.DREDDuration = curStatus.avgLoss >= 0.4 ? CalcDREDDuration(curStatus.avgLoss) : 0;
+
             encoder.PacketLoss = (int)(curStatus.avgLoss * 100);
+        }
+
+        private int CalcDREDDuration(float loss)
+        {
+            // Buffer 100ms per 10% packet loss, 200ms by default (LBRR + one DRED.) Max 0.8s DRED.
+            // int baseDur = 20;
+            int lossPerc = (int)(loss * 100);
+            int lossDur = lossPerc - 20; // ((lossPerc - 40) / 10) * 10
+
+            return lossDur; // baseDur + lossDur
         }
 
         private void JamModifier(ref float[] samples)

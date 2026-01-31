@@ -7,14 +7,14 @@ namespace NuclearVOIP
 {
     internal class OpusDecoder: AbstractTransform<byte[], float>
     {
-        private readonly Decoder decoder = new(48000, 1)
+        private readonly Decoder decoder = new(48000, 1, true)
         {
             BWE = true,
             Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256, MidpointRounding.AwayFromZero),
             Complexity = 10
         };
 
-        private bool packetLost = false;
+        private int loss = 0;
 
         private byte costi = 0;
         private readonly int[] costs = new int[6];
@@ -32,24 +32,19 @@ namespace NuclearVOIP
         {
             if (packet.Length <= 2) // DTX/Lost packet
             {
-                if (packetLost)
-                    return decoder.DecodeLoss(null, 20);
-                else
-                {
-                    packetLost = true;
-                    return [];
-                }
-            } 
+                loss++;
+                return [];
+            }
             else
             {
                 Stopwatch sw = Stopwatch.StartNew();
 
                 float[] prefix;
 
-                if (packetLost)
+                if (loss > 0)
                 {
-                    prefix = decoder.DecodeLoss(packet, 20);
-                    packetLost = false;
+                    prefix = decoder.DecodeLoss(packet, loss, 20);
+                    loss = 0;
                 }
                 else
                     prefix = [];
@@ -72,7 +67,7 @@ namespace NuclearVOIP
                         decoder.Complexity -= 1;
                 }
 
-                return [..prefix, ..decoded];
+                return [.. prefix, .. decoded];
             }
         }
     }
