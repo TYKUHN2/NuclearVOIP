@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -105,17 +105,19 @@ namespace LibOpus
             return decoded;
         }
 
-        public float[] DecodeLoss(byte[] packet, float duration)
+        public float[] DecodeLoss(byte[]? packet, float duration)
         {
             int frame_size = (int)(freq * duration);
 
             float[] decoded = new float[frame_size];
 
-            int fec = OpusTypes.opus_packet_has_lbrr(packet, packet.Length);
-            int err;
+            int fec = packet == null ? 0 : OpusTypes.opus_packet_has_lbrr(packet, packet.Length);
+            if (fec < 0)
+                throw new OpusTypes.OpusException(fec);
 
+            int err;
             if (fec == 1)
-                err = OpusTypes.opus_decode_float(decoder, packet, packet.Length, decoded, frame_size, 1);
+                err = OpusTypes.opus_decode_float(decoder, packet, packet!.Length, decoded, frame_size, 1);
             else
                 err = OpusTypes.opus_decode_float(decoder, null, 0, decoded, frame_size, 0);
 

@@ -184,6 +184,9 @@ namespace LibOpus
 
         public byte[] Encode(float[] samples)
         {
+            if (samples.Length != FrameSize)
+                throw new ArgumentException($"LibOpus.Encoder: Samples must be of size {FrameSize}");
+
             byte[] frame = new byte[4000];
 
             int err = OpusTypes.opus_encode_float(encoder, samples, FrameSize, frame, 4000);

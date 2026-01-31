@@ -32,8 +32,13 @@ namespace NuclearVOIP
         {
             if (packet.Length <= 2) // DTX/Lost packet
             {
-                packetLost = true;
-                return [];
+                if (packetLost)
+                    return decoder.DecodeLoss(null, 20);
+                else
+                {
+                    packetLost = true;
+                    return [];
+                }
             } 
             else
             {
@@ -41,8 +46,11 @@ namespace NuclearVOIP
 
                 float[] prefix;
 
-                if (packetLost && Plugin.Instance.configUseFEC.Value)
-                    prefix = decoder.DecodeLoss(packet, 20 /* TODO */);
+                if (packetLost)
+                {
+                    prefix = decoder.DecodeLoss(packet, 20);
+                    packetLost = false;
+                }
                 else
                     prefix = [];
 
