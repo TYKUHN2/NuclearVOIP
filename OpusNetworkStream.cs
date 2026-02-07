@@ -6,8 +6,7 @@ namespace NuclearVOIP
 {
     internal class OpusNetworkStream(Action<byte[][]> handler)
     {
-        // TODO: Stronger typed dead packets so that we can properly use FEC/LBRR
-        private static readonly byte[] deadPacket = [13]; // DTX / Lost packet
+        private static readonly byte[] deadPacket = []; // DTX / Lost packet
 
         private readonly Action<byte[][]> handler = handler;
 
@@ -15,8 +14,6 @@ namespace NuclearVOIP
         private ushort lost = 0;
 
         private byte[][]? delayed;
-
-        //private readonly Random rand = new();
 
         public byte Loss
         {
@@ -40,7 +37,7 @@ namespace NuclearVOIP
 
             while (stream.Position != stream.Length)
             {
-                if (stream.Position - 1 == stream.Length)
+                if (stream.Position + 2 <= stream.Length)
                 {
                     Plugin.Logger.LogWarning("VOIP packet truncated");
                     break;
@@ -59,11 +56,6 @@ namespace NuclearVOIP
                     Plugin.Logger.LogWarning("VOIP packet truncated");
                     break;
                 }
-
-                /*if (rand.NextDouble() >= 0.4) // 40% packet loss
-                    packets.AddLast(packet);
-                else
-                    packets.AddLast(deadPacket);*/
 
                 packets.AddLast(packet);
             }
