@@ -4,7 +4,7 @@
     <AssemblyName>NuclearVOIP</AssemblyName>
     <Product />
     <Version>0.1.0</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
@@ -35,6 +35,12 @@
   <PropertyGroup Condition="'$(Configuration)'=='Debug-Bep5' Or '$(Configuration)'=='Debug-Bep6'">
     <DebugType>portable</DebugType>
     <DefineConstants>DEBUG;$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)'=='Release-Bep5' Or '$(Configuration)'=='Release-Bep6'">
+    <DebugType>none</DebugType>
+    <DefineConstants>RELEASE;$(DefineConstants)</DefineConstants>
+	<Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
