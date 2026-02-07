@@ -19,8 +19,6 @@ Global
 		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Debug-Bep6|x64.Build.0 = Debug-Bep6|x64
 		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep5|x64.ActiveCfg = Release-Bep5|x64
 		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep5|x64.Build.0 = Release-Bep5|x64
-		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep6|Any CPU.ActiveCfg = Release-Bep6|x64
-		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep6|Any CPU.Build.0 = Release-Bep6|x64
 		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep6|x64.ActiveCfg = Release-Bep6|x64
 		{38898A3D-85C3-4D5C-9FAD-D6AFB162C30A}.Release-Bep6|x64.Build.0 = Release-Bep6|x64
 	EndGlobalSection

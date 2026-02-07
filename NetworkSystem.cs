@@ -168,7 +168,13 @@ namespace NuclearVOIP
 
         public void SendToTeam(byte[] data)
         {
-            GameManager.GetLocalHQ(out FactionHQ ourHQ);
+            GameManager.GetLocalHQ(out FactionHQ? ourHQ);
+            if (ourHQ == null)
+            {
+                SendToAll(data);
+                return;
+            }
+
             Player[] team = [..ourHQ.GetPlayers(false)];
 
             foreach (ulong identity in connections)
