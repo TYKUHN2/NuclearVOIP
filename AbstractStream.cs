@@ -25,6 +25,9 @@ namespace NuclearVOIP
 
         public virtual void Write(T[] data)
         {
+            if (data.Length == 0)
+                return;
+
             if (consumer != null)
             {
                 consumer.Write(data);

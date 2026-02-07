@@ -1,13 +1,11 @@
-﻿using NuclearVOIP.UI;
-using Steamworks;
+using NuclearVOIP.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using System.Reflection;
 using NuclearOption.Networking;
-
-
+using LibOpus;
 
 #if BEP6
 using BepInEx.Unity.Mono.Configuration;
@@ -29,7 +27,7 @@ namespace NuclearVOIP
         private KeyboardShortcut? activeKey;
         private TalkingList? talkingList;
 
-        private readonly Dictionary<CSteamID, StreamPlayer> players = [];
+        private readonly Dictionary<ulong, StreamPlayer> players = [];
 
         public event Action<byte[][]>? OnData;
         public event Action<OpusMultiStreamer.Target>? OnTarget;
@@ -42,8 +40,8 @@ namespace NuclearVOIP
             minBandwidth = 0,
             avgBandwidth = 0,
 
-            minQuality = 1,
-            avgQuality = 1
+            maxLoss = 0,
+            avgLoss = 0
         };
 
         private NetworkStatus teamStatus = new()
@@ -54,22 +52,22 @@ namespace NuclearVOIP
             minBandwidth = 0,
             avgBandwidth = 0,
 
-            minQuality = 1,
-            avgQuality = 1
+            maxLoss = 0,
+            avgLoss = 0
         };
 
         public void Awake()
         {
             listener = gameObject.AddComponent<MicrophoneListener>();
 
-            listener.OnData += (StreamArgs<float> args) =>
+            listener.OnData += args =>
             {
                 if (encoder == null)
                     return;
 
                 args.Handle();
 
-                float[] boosted = args.data.Select(a => a * Plugin.Instance.configInputGain.Value).ToArray();
+                float[] boosted = [.. args.data.Select(a => a * Plugin.Instance.configInputGain.Value)];
 
                 encoder.Write(boosted);
             };
@@ -128,7 +126,7 @@ namespace NuclearVOIP
             encoder = null;
         }
 
-        internal Action<byte[][]> NewStream(CSteamID player)
+        internal Action<byte[][]> NewStream(ulong player)
         {
             Plugin.Instance.Config.Reload();
 
@@ -142,12 +140,11 @@ namespace NuclearVOIP
             newObj.transform.parent = gameObject.transform;
 
             StreamPlayer sPlayer = newObj.AddComponent<StreamPlayer>();
-            sPlayer.decoder.Gain = (int)Math.Round(Plugin.Instance.configOutputGain.Value * 256);
 
             players[player] = sPlayer;
 
             Player playerObj = UnitRegistry.playerLookup
-                .Where(a => a.Value.SteamID == player.m_SteamID)
+                .Where(a => a.Value.SteamID == player)
                 .First()
                 .Value;
 
@@ -159,7 +156,7 @@ namespace NuclearVOIP
             return sPlayer.decoder.Write;
         }
 
-        internal void DestroyStream(CSteamID player)
+        internal void DestroyStream(ulong player)
         {
             if (!players.TryGetValue(player, out StreamPlayer sPlayer))
             {
@@ -171,7 +168,7 @@ namespace NuclearVOIP
             Destroy(sPlayer.gameObject);
 
             Player playerObj = UnitRegistry.playerLookup
-                .Where(a => a.Value.SteamID == player.m_SteamID)
+                .Where(a => a.Value.SteamID == player)
                 .First()
                 .Value;
 
@@ -211,9 +208,20 @@ namespace NuclearVOIP
 
             NetworkStatus curStatus = activeKey.Equals(Plugin.Instance.configAllTalkKey.Value) ? allStatus : teamStatus;
 
-            encoder.BitRate = curStatus.minBandwidth == 0 ? -1000 : (int)(curStatus.minBandwidth * 7.2); // 8 bits per byte, 90% saturation
-            encoder.FEC = curStatus.avgQuality <= 0.75 ? LibOpus.FEC.RELAXED : LibOpus.FEC.DISABLED;
-            encoder.PacketLoss = 100 - (int)(curStatus.avgQuality * 100);
+            encoder.FEC = curStatus.avgLoss >= 0.25 ? OpusTypes.FEC.AGGRESSIVE : OpusTypes.FEC.DISABLED;
+            encoder.DREDDuration = curStatus.avgLoss >= 0.4 ? CalcDREDDuration(curStatus.avgLoss) : 0;
+
+            encoder.PacketLoss = (int)(curStatus.avgLoss * 100);
+        }
+
+        private int CalcDREDDuration(float loss)
+        {
+            // Buffer 100ms per 10% packet loss, 200ms by default (LBRR + one DRED.) Max 0.8s DRED.
+            // int baseDur = 20;
+            int lossPerc = (int)(loss * 100);
+            int lossDur = lossPerc - 20; // ((lossPerc - 40) / 10) * 10
+
+            return lossDur; // baseDur + lossDur
         }
 
         private void JamModifier(ref float[] samples)

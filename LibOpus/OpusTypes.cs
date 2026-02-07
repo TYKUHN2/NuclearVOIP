@@ -1,42 +1,17 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace NuclearVOIP
+namespace LibOpus
 {
-    internal static class LibOpus
+    public static class OpusTypes
     {
+        internal static readonly int[] GOOD_FREQS = [8000, 12000, 16000, 24000, 48000];
+
         public enum Modes
         {
             VOIP = 2048,
             AUDIO = 2049,
             LOWDELAY = 2051
-        }
-
-        public enum EncoderCtl
-        {
-            SET_BITRATE = 4002,
-            GET_BITRATE = 4003,
-            SET_COMPLEXITY = 4010,
-            GET_COMPLEXITY = 4011,
-            SET_INBAND_FEC = 4012,
-            GET_INBAND_FEC = 4013,
-            SET_PACKET_LOSS_PERC = 4014,
-            GET_PACKET_LOSS_PERC = 4015,
-            SET_DTX = 4016,
-            GET_DTX = 4017,
-            SET_SIGNAL = 4024,
-            GET_SIGNAL = 4025,
-            GET_LOOKAHEAD = 4027,
-            SET_LSB_DEPTH = 4036,
-            GET_LSB_DEPTH = 4037
-        }
-
-        public enum DecoderCtl
-        {
-            SET_COMPLEXITY = 4010,
-            GET_COMPLEXITY = 4011,
-            SET_GAIN = 4034,
-            GET_GAIN = 4045
         }
 
         public enum Signal
@@ -51,6 +26,15 @@ namespace NuclearVOIP
             DISABLED,
             AGGRESSIVE,
             RELAXED
+        }
+
+        public enum Bandwidth
+        { 
+            NARROW = 1101,
+            MEDIUM = 1102,
+            WIDE = 1103,
+            SUPERWIDE = 1104,
+            FULL = 1105
         }
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -77,13 +61,31 @@ namespace NuclearVOIP
         public static extern int opus_decoder_init(IntPtr decoder, int freq, int channels);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
-        public static extern int opus_decode_float(IntPtr decoder, byte[] data, int length, float[] pcm, int frame_size, int fec);
+        public static extern int opus_decode_float(IntPtr decoder, byte[]? data, int length, float[] pcm, int frame_size, int fec);
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int opus_decoder_ctl(IntPtr decoder, int req, int val); // vararg not fun
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern int opus_decoder_ctl(IntPtr decoder, int req, out int val); // get variant
+
+
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_decoder_get_size();
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_decoder_init(IntPtr dred);
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_get_size();
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_dred_parse(IntPtr dred, IntPtr dpack, byte[] packet, int len, int samples, int rate, out int end, int defer);
+
+        [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int opus_decoder_dred_decode_float(IntPtr dred, IntPtr dpack, int offset, float[] pcm, int size);
+
 
 
         [DllImport("opus.dll", CallingConvention = CallingConvention.Cdecl)]

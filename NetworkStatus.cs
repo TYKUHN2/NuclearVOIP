@@ -2,8 +2,8 @@
 {
     public struct NetworkStatus
     {
-        public float avgQuality;
-        public float minQuality;
+        public float avgLoss;
+        public float maxLoss;
 
         public int avgPing;
         public int maxPing;

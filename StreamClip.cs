@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using UnityEngine;
 
 namespace NuclearVOIP
@@ -36,6 +37,7 @@ namespace NuclearVOIP
         // Runs on a different thread, suddenly really happy I made the Streams threadsafe.
         private void OnAudioFilterRead(float[] data, int channels)
         {
+            Stopwatch sw = Stopwatch.StartNew();
             int perChannel = data.Length / channels;
             int count = buffer.Count();
 
@@ -68,6 +70,10 @@ namespace NuclearVOIP
                 for (int j = 0; j < channels; j++)
                     data[offset + j] += samples[i];
             }
+
+            sw.Stop();
+            if (sw.ElapsedMilliseconds > 20)
+                Plugin.Logger.LogDebug("Warning! StreamClip filter exceeds RT timeframe!");
         }
     }
 }

@@ -1,147 +1,63 @@
 using System;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
-//using UnityEngine;
+using LibOpus;
 
 namespace NuclearVOIP
 {
     internal class OpusEncoder: AbstractTransform<float, byte[]>
     {
         //private int frame = 0;
+        private readonly Encoder encoder;
 
-        private const bool DECODER_TEST = false;
-        private readonly IntPtr encoder;
-        private readonly IntPtr decoder;
-        private bool decoder_good = true;
-        private readonly int frameSize;
         private readonly Mutex readLock = new(); // Currently not internally reordered so locking is needed
         private bool closed = false;
 
+        private byte costi = 0;
+        private readonly int[] costs = new int[6];
+
         private float[]? leftover;
 
-        public readonly int lookahead;
+        public int LookAhead
+        {
+            get => encoder.LookAhead;
+        }
 
         public int BitRate
         {
-            get
-            {
-                return GetCtl(LibOpus.EncoderCtl.GET_BITRATE);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_BITRATE, value == -1000 ? value : Math.Clamp(value, 500, 512000));
-            }
+            get => encoder.BitRate;
+            set => encoder.BitRate = value;
+        }
+
+        public OpusTypes.FEC FEC
+        {
+            get => encoder.FEC;
+            set => encoder.FEC = value;
         }
 
         public int PacketLoss
         {
-            get
-            {
-                return GetCtl(LibOpus.EncoderCtl.GET_PACKET_LOSS_PERC);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_PACKET_LOSS_PERC, Math.Clamp(value, 0, 100));
-            }
+            get => encoder.PacketLoss;
+            set => encoder.PacketLoss = value;
         }
 
-        public LibOpus.FEC FEC
+        public int DREDDuration
         {
-            get
-            {
-                return (LibOpus.FEC)GetCtl(LibOpus.EncoderCtl.GET_INBAND_FEC);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_INBAND_FEC, (int)value);
-            }
+            get => encoder.DREDDuration;
+            set => encoder.DREDDuration = value;
         }
 
-        public bool DTX
+        public OpusEncoder(int frequency)
         {
-            get
+            encoder = new Encoder(frequency, 1, 20, OpusTypes.Modes.VOIP)
             {
-                return GetCtl(LibOpus.EncoderCtl.GET_DTX) == 1;
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_DTX, value ? 1 : 0);
-            }
-        }
-
-        public LibOpus.Signal Signal
-        {
-            get
-            {
-                return (LibOpus.Signal)GetCtl(LibOpus.EncoderCtl.GET_SIGNAL);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_SIGNAL, (int)value);
-            }
-        }
-
-        public int LSB_Depth
-        {
-            get
-            {
-                return GetCtl(LibOpus.EncoderCtl.GET_LSB_DEPTH);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_LSB_DEPTH, Math.Clamp(value, 8, 24));
-            }
-        }
-
-        public int Complexity
-        {
-            get
-            {
-                return GetCtl(LibOpus.EncoderCtl.GET_COMPLEXITY);
-            }
-            set
-            {
-                SetCtl(LibOpus.EncoderCtl.SET_COMPLEXITY, Math.Clamp(value, 0, 10));
-            }
-        }
-
-        unsafe public OpusEncoder(int frequency)
-        {
-            frameSize = (int)(0.02 * frequency);
-
-            encoder = Marshal.AllocHGlobal(LibOpus.opus_encoder_get_size(1));
-            int err = LibOpus.opus_encoder_init(encoder, frequency, 1, (int)LibOpus.Modes.VOIP);
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(encoder);
-                throw new LibOpus.OpusException(err);
-            }
-
-            if (DECODER_TEST)
-            {
-                decoder = Marshal.AllocHGlobal(LibOpus.opus_decoder_get_size(1));
-                err = LibOpus.opus_decoder_init(decoder, frequency, 1);
-                if (err != 0)
-                {
-                    Marshal.FreeHGlobal(encoder);
-                    Marshal.FreeHGlobal(decoder);
-                    throw new LibOpus.OpusException(err);
-                }
-            }
-
-            BitRate = 24000;
-            //FEC = LibOpus.FEC.AGGRESSIVE;
-            //DTX = true;
-            Signal = LibOpus.Signal.VOICE;
-            lookahead = GetCtl(LibOpus.EncoderCtl.GET_LOOKAHEAD);
-        }
-
-        ~OpusEncoder()
-        {
-            Marshal.FreeHGlobal(encoder);
-
-            if (DECODER_TEST)
-                Marshal.FreeHGlobal(decoder);
+                //DTX = true,
+                BitRate = 32000,
+                Signal = OpusTypes.Signal.VOICE, // We only care about voice, use SILK and benefit from BWE=
+                Bandwidth = OpusTypes.Bandwidth.WIDE, // BWE means we don't need to encode the full bandwidth
+                Complexity = 10
+            };
         }
 
         private byte[][] DoEncode(StreamArgs<float> args)
@@ -153,33 +69,9 @@ namespace NuclearVOIP
             {
                 args.Handle();
 
-                /*if (frame > (Time.frameCount + 5)) // Only update every 6 frames, supports roll over.
-                {
-                    int curComplexity = Complexity; // Avoid repeatedly fetching
-                    int framerate = Plugin.Instance.FrameRate;
-
-                    if (QualitySettings.vSyncCount == 1)
-                    {
-                        int difference = ((int)Math.Round(Screen.currentResolution.refreshRateRatio.value)) - framerate;
-
-                        if (difference >= 3 && curComplexity > 0)
-                            Complexity = curComplexity - 1;
-                        else if (difference <= 1 && curComplexity < 10)
-                            Complexity = curComplexity + 1;
-                    }
-                    else if (framerate < 20 && curComplexity > 1)
-                        Complexity = curComplexity - 2;
-                    else if (framerate < 50 && curComplexity > 0)
-                        Complexity = curComplexity - 1;
-                    else if (framerate > 70 && curComplexity < 10)
-                        Complexity = curComplexity + 1;
-
-                    frame = Time.frameCount;
-                }*/
-
                 float[] rawFrames = leftover == null ? args.data : [..leftover, ..args.data];
 
-                int mod = rawFrames.Length % frameSize;
+                int mod = rawFrames.Length % encoder.FrameSize;
                 if (mod == 0)
                     leftover = null;
                 else
@@ -191,12 +83,12 @@ namespace NuclearVOIP
                 if (rawFrames.Length == 0)
                     return [];
 
-                byte[][] encoded = new byte[rawFrames.Length / frameSize][];
-                int offset = -frameSize;
+                byte[][] encoded = new byte[rawFrames.Length / encoder.FrameSize][];
+                int offset = -encoder.FrameSize;
                 for (int i = 0; i < encoded.Length; i++)
                 {
-                    offset += frameSize;
-                    encoded[i] = EncodeFrame(rawFrames[offset..(offset + frameSize)]);
+                    offset += encoder.FrameSize;
+                    encoded[i] = EncodeFrame(rawFrames[offset..(offset + encoder.FrameSize)]);
                 }
 
                 return encoded;
@@ -217,7 +109,7 @@ namespace NuclearVOIP
 
                 if (leftover != null)
                 {
-                    Array.Resize(ref leftover, frameSize); // Should never be a frame size or bigger, else would have already encoded
+                    Array.Resize(ref leftover, encoder.FrameSize); // Should never be a frame size or bigger, else would have already encoded
 
                     _Write([EncodeFrame(leftover)]);
                 }
@@ -236,82 +128,30 @@ namespace NuclearVOIP
             return DoEncode(new(samples));
         }
 
-        private unsafe byte[] EncodeFrame(float[] samples)
+        private byte[] EncodeFrame(float[] samples)
         {
-            byte[] frame = new byte[4000];
 
-            int err = LibOpus.opus_encode_float(encoder, samples, frameSize, frame, 4000);
-            if (err < 0)
-                throw new LibOpus.OpusException(err);
+            Stopwatch sw = Stopwatch.StartNew();
 
-            Array.Resize(ref frame, err);
+            byte[] frame = encoder.Encode(samples);
 
-            if (DECODER_TEST && decoder_good)
+            sw.Stop();
+
+            costs[costi++] = (int)sw.ElapsedMilliseconds;
+
+            if (costi == costs.Length)
             {
-                float[] decoded = new float[5760];
-                err = LibOpus.opus_decode_float(decoder, frame, frame.Length, decoded, 5760, 0);
+                costi = 0;
 
-                if (err < 0)
-                {
-                    Plugin.Logger.LogWarning("Decoder failure when verifying encoding. Disabling verification.");
-                    decoder_good = false;
-                }
-                else
-                {
-                   if (err != frameSize)
-                        throw new ValidationException();
+                int avgCost = (int)Math.Ceiling(costs.Average());
 
-                    Array.Resize(ref decoded, err);
-                    for (int i = 0; i < frameSize; i++)
-                    {
-                        float error = decoded[i] - samples[i];
-
-                        if (Math.Abs(error) > 0.2)
-                        {
-                            ValidationException exception = new(samples[i], decoded[i]);
-                            //throw exception;
-                            Plugin.Logger.LogWarning($"{exception.Message} error = {error}. Disabling verification.");
-                            decoder_good = false;
-                        }
-                    }
-                }
+                if (avgCost > 40) // On average we are two or more packets too slow
+                    encoder.Complexity -= 2;
+                else if (avgCost > 20) // On average we are one packet too slow
+                    encoder.Complexity -= 1;
             }
 
             return frame;
         }
-
-        private void SetCtl(LibOpus.EncoderCtl ctl, int val)
-        {
-            int err = LibOpus.opus_encoder_ctl(encoder, (int)ctl, val);
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(encoder);
-                throw new LibOpus.OpusException(err);
-            }
-        }
-
-        private unsafe int GetCtl(LibOpus.EncoderCtl ctl)
-        {
-            int err = LibOpus.opus_encoder_ctl(encoder, (int)ctl, out int result);
-
-            if (err != 0)
-            {
-                Marshal.FreeHGlobal(encoder);
-                throw new LibOpus.OpusException(err);
-            }
-
-            return result;
-        }
-
-        public class ValidationException: Exception
-        {
-            internal ValidationException(): base("encoder decoder length disagreement")
-            {
-            }
-
-            internal ValidationException(float encoded, float decoded): base($"encoder decoder sample disagreement ({encoded}, {decoded})")
-            {
-            }
-        };
     }
 }

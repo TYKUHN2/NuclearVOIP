@@ -5,20 +5,25 @@ using System.Threading;
 using BepInEx.Logging;
 using Steamworks;
 using UnityEngine;
+using AtomicFramework;
 using NuclearOption.Networking;
 
 
 #if BEP6
-using BepInEx.Unity.Mono;
 using BepInEx.Unity.Mono.Configuration;
 #endif
 
 namespace NuclearVOIP
 {
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
-    [BepInProcess("NuclearOption.exe")]
-    public class Plugin : BaseUnityPlugin
+    public class Plugin: Mod
     {
+        private static readonly Options options = new()
+        {
+            multiplayerOptions = Options.Multiplayer.CLIENT_ONLY,
+            repository = "TYKUHN2/NuclearVOIP"
+        };
+
         private static Plugin? _Instance;
         internal static Plugin Instance
         {
@@ -31,15 +36,11 @@ namespace NuclearVOIP
             }
         }
 
-        internal new static ManualLogSource Logger
-        {
-            get { return Instance._Logger; }
-        }
+        internal new NetworkAPI? Networking => base.Networking;
 
-        private ManualLogSource _Logger
-        {
-            get { return base.Logger; }
-        }
+        internal new static ManualLogSource Logger => Instance._Logger;
+
+        private ManualLogSource _Logger => base.Logger;
 
         internal OpusMultiStreamer? streamer;
 
@@ -47,33 +48,10 @@ namespace NuclearVOIP
         internal readonly ConfigEntry<KeyboardShortcut> configAllTalkKey;
         internal readonly ConfigEntry<KeyboardShortcut> configChannelKey;
 
-        internal readonly ConfigEntry<int> configVOIPPort;
         internal readonly ConfigEntry<float> configInputGain;
         internal readonly ConfigEntry<float> configOutputGain;
 
-#if DEBUG
-        internal readonly bool NET_DEBUG = true;
-#else
-        internal readonly bool NET_DEBUG = false;
-#endif
-
-        private float[] deltas = new float[10];
-
-        public int FrameRate
-        {
-            get
-            {
-                double sum = 0;
-                foreach (var delta in deltas)
-                    sum += delta;
-
-                sum /= deltas.Length;
-
-                return (int)Math.Round(sum);
-            }
-        }
-
-        Plugin()
+        Plugin(): base(options)
         {
             if (Interlocked.CompareExchange(ref _Instance, this, null) != null) // I like being thread safe okay?
                 throw new InvalidOperationException($"Reinitialization of Plugin {MyPluginInfo.PLUGIN_GUID}");
@@ -99,13 +77,6 @@ namespace NuclearVOIP
                     "Change talk channel"
                 );
 
-            configVOIPPort = Config.Bind(
-                    "General",
-                    "VOIP Port",
-                    5000,
-                    "The port to discover and transmit voice chat on"
-                );
-
             configInputGain = Config.Bind(
                     "General",
                     "Microphone Gain",
@@ -119,8 +90,6 @@ namespace NuclearVOIP
                     1.0f,
                     "A (in dB) multiplier applied to incoming voice"
                 );
-
-            LoadingManager.GameLoaded += LateLoad;
         }
 
         ~Plugin()
@@ -131,14 +100,8 @@ namespace NuclearVOIP
         private void Awake()
         {
             Logger.LogInfo($"Loaded {MyPluginInfo.PLUGIN_GUID}");
-        }
 
-        private void Update()
-        {
-            float[] copy = new float[10];
-            copy[9] = Time.deltaTime;
-            Array.Copy(deltas, 1, copy, 0, 9);
-            deltas = copy;
+            LoadingManager.NetworkReady += LateLoad;
         }
 
         private void LateLoad()
@@ -176,21 +139,12 @@ namespace NuclearVOIP
 
         private void LoadingFinished()
         {
-            if (NET_DEBUG || GameManager.gameState != GameState.SinglePlayer)
-            {
-                GameManager.GetLocalPlayer(out Player localPlayer);
-                GameObject host = localPlayer.gameObject;
-                INetworkSystem networkSystem;
+            GameManager.GetLocalPlayer(out Player localPlayer);
+            GameObject host = localPlayer.gameObject;
+            NetworkSystem networkSystem = host.AddComponent<NetworkSystem>();
+            CommSystem comms = host.AddComponent<CommSystem>();
 
-                if (NET_DEBUG && GameManager.gameState == GameState.SinglePlayer)
-                    networkSystem = host.AddComponent<DebugNetworkSystem>();
-                else
-                    networkSystem = host.AddComponent<NetworkSystem>();
-
-                CommSystem comms = host.AddComponent<CommSystem>();
-
-                streamer = new(comms, networkSystem);
-            }
+            streamer = new(comms, networkSystem);
         }
     }
 }

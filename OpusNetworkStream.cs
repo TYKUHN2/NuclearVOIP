@@ -6,7 +6,7 @@ namespace NuclearVOIP
 {
     internal class OpusNetworkStream(Action<byte[][]> handler)
     {
-        private static readonly byte[] deadPacket = [13]; // DTX / Lost packet
+        private static readonly byte[] deadPacket = []; // DTX / Lost packet
 
         private readonly Action<byte[][]> handler = handler;
 
@@ -37,7 +37,7 @@ namespace NuclearVOIP
 
             while (stream.Position != stream.Length)
             {
-                if (stream.Position - 1 == stream.Length)
+                if (stream.Position + 2 <= stream.Length)
                 {
                     Plugin.Logger.LogWarning("VOIP packet truncated");
                     break;
@@ -74,31 +74,32 @@ namespace NuclearVOIP
                 {
                     default: // More than 1 packet behind
                         break;
-                    case 0: // One packet behind
-                        if (delayed != null)
+                    case -1: // One packet behind
+                        if (delayed != null) // Caught up
                         {
                             handler([..packetArr, ..delayed]);
                             delayed = null;
                         }
                         break;
-                    case 1: // On time
+                    case 0: // On time
                         if (delayed == null)
                             handler(packetArr);
-                        else // Ditch the delay and just backfill dead packet
+                        else // Stop waiting
                         {
-                            handler([deadPacket, .. packetArr]);
+                            handler([deadPacket, ..delayed, .. packetArr]);
+                            delayed = null;
                             lost++;
                         }
 
-                        pos = id;
+                        pos++;
                         break;
-                    case > 1: // Ahead of time
+                    case > 0: // Ahead of time
                         delayed = packetArr;
                         lost += (ushort)(diff - 1);
                         byte[][] backfill = new byte[diff - 1][];
                         Array.Fill(backfill, deadPacket);
                         handler(backfill);
-                        pos = id;
+                        pos = (ushort)(id + 1);
                         break;
                 }
             }

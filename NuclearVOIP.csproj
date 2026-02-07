@@ -3,8 +3,8 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>NuclearVOIP</AssemblyName>
     <Product />
-    <Version>0.1.0</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.5.0</Version>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
@@ -21,7 +21,7 @@
     <Platforms>x64</Platforms>
     <Configurations>Debug-Bep6;Release-Bep6;Debug-Bep5;Release-Bep5</Configurations>
     <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-    <NoWarn>8618;0162;8500;BepInEx002</NoWarn>
+    <NoWarn>8618;0162;8500;BepInEx002;IDE1006</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug-Bep6' Or '$(Configuration)'=='Release-Bep6'">
@@ -36,6 +36,12 @@
     <DebugType>portable</DebugType>
     <DefineConstants>DEBUG;$(DefineConstants)</DefineConstants>
   </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(Configuration)'=='Release-Bep5' Or '$(Configuration)'=='Release-Bep6'">
+    <DebugType>none</DebugType>
+    <DefineConstants>RELEASE;$(DefineConstants)</DefineConstants>
+	<Optimize>true</Optimize>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="BepInEx.Analyzers" Version="1.0.8" PrivateAssets="all" />
@@ -45,10 +51,18 @@
 
   <ItemGroup Condition="'$(Configuration)'=='Debug-Bep6' Or '$(Configuration)'=='Release-Bep6'">
     <PackageReference Include="BepInEx.Unity.Mono" Version="6.0.0-be.732" IncludeAssets="compile" PrivateAssets="all" />
+    <Reference Include="AtomicFramework">
+      <HintPath>..\AtomicFramework\bin\Release-Bep6\BepInEx\plugins\AtomicFramework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Debug-Bep5' Or '$(Configuration)'=='Release-Bep5'">
     <PackageReference Include="BepInEx.Core" Version="5.4.21" />
+    <Reference Include="AtomicFramework">
+      <HintPath>..\AtomicFramework\bin\Release-Bep5\BepInEx\plugins\AtomicFramework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
@@ -92,7 +106,7 @@
       <HintPath>D:\SteamLibrary\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Compile Remove="crc/**/*.cs" />
-    <Compile Remove="Ogg*.cs" />
+    <!--<Compile Remove="crc/**/*.cs" />-->
+    <!--<Compile Remove="Ogg*.cs" />-->
   </ItemGroup>
 </Project>

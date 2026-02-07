@@ -17,10 +17,15 @@ namespace NuclearVOIP
             source = gameObject.AddComponent<AudioSource>();
             clip = gameObject.AddComponent<StreamClip>();
 
-            clip.OnReady += () => { source.Play(); };
-            clip.OnDry += () => { source.Pause(); };
 
-            decoder.OnData += (StreamArgs<float> args) =>
+            // Implement jitter buffer by delayig OnDry and OnReady
+            clip.OnReady += () => { source.Play(); };
+            clip.OnDry += () => {
+                Plugin.Logger.LogDebug("Ran Dry");
+                source.Pause(); 
+            };
+
+            decoder.OnData += args =>
             {
                 args.Handle();
 
@@ -29,6 +34,12 @@ namespace NuclearVOIP
 
                 clip.Write(samples);
             };
+        }
+
+        void Destroy()
+        {
+            Destroy(clip);
+            Destroy(source);
         }
     }
 }
